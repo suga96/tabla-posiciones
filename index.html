@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tabla de Posiciones - Vendedores</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <!-- Header compacto para TV -->
+        <div class="tv-header">
+            <div class="company-logo">
+                <i class="fas fa-trophy"></i>
+                <span>Ranking de Ventas</span>
+            </div>
+            <div class="live-indicator">
+                <div class="pulse-dot"></div>
+                <span>EN VIVO</span>
+            </div>
+        </div>
+
+        <!-- Layout principal para TV -->
+        <div class="tv-layout">
+            <!-- Tabla de Ranking con Rotación -->
+            <div class="ranking-section">
+                <!-- Indicador de Período -->
+                <div class="period-indicator">
+                    <div class="period-header">
+                        <h2 id="currentPeriodTitle">📊 Ranking Diario</h2>
+                        <div class="period-dots">
+                            <span class="dot active" data-period="diario"></span>
+                            <span class="dot" data-period="semanal"></span>
+                            <span class="dot" data-period="mensual"></span>
+                        </div>
+                    </div>
+                    <div class="period-info">
+                        <span id="periodDate">Hoy</span>
+                        <span class="rotation-timer">⏱️ <span id="rotationCounter">10</span>s</span>
+                    </div>
+                </div>
+
+                <!-- Contenedor de Tablas -->
+                <div class="tables-container">
+                    <!-- Tabla Diaria -->
+                    <div class="table-container active" id="tabla-diario">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Pos</th>
+                                    <th>Vendedor</th>
+                                    <th>Ventas Hoy</th>
+                                    <th>N° Ventas</th>
+                                    <th>Promedio</th>
+                                </tr>
+                            </thead>
+                            <tbody id="rankingBody-diario">
+                                <!-- Los datos se llenarán dinámicamente -->
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Tabla Semanal -->
+                    <div class="table-container" id="tabla-semanal">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Pos</th>
+                                    <th>Vendedor</th>
+                                    <th>Ventas Semana</th>
+                                    <th>N° Ventas</th>
+                                    <th>Promedio</th>
+                                </tr>
+                            </thead>
+                            <tbody id="rankingBody-semanal">
+                                <!-- Los datos se llenarán dinámicamente -->
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Tabla Mensual -->
+                    <div class="table-container" id="tabla-mensual">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Pos</th>
+                                    <th>Vendedor</th>
+                                    <th>Ventas Mes</th>
+                                    <th>N° Ventas</th>
+                                    <th>Promedio</th>
+                                </tr>
+                            </thead>
+                            <tbody id="rankingBody-mensual">
+                                <!-- Los datos se llenarán dinámicamente -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Panel lateral con controles y estadísticas -->
+            <div class="tv-sidebar">
+                <!-- Panel de Control Compacto -->
+                <div class="control-panel-compact">
+                    <div class="compact-card">
+                        <h3><i class="fas fa-user-plus"></i> Nuevo Vendedor</h3>
+                        <form id="vendedorForm">
+                            <input type="text" id="nombreVendedor" placeholder="Nombre del vendedor" required>
+                            <button type="submit"><i class="fas fa-plus"></i></button>
+                        </form>
+                    </div>
+
+                    
+
+                    <div class="compact-card">
+                        <h3><i class="fas fa-shopping-cart"></i> Registrar Venta</h3>
+                        <form id="ventaForm" class="vertical-form">
+                            <select id="vendedorSelect" required>
+                                <option value="">Seleccionar vendedor</option>
+                            </select>
+                            <div class="input-button-row">
+                                <input type="number" id="montoVenta" placeholder="Monto" min="0" step="0.01" required>
+                                <button type="submit"><i class="fas fa-dollar-sign"></i></button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Estadísticas Compactas -->
+                <div class="stats-compact">
+                    <div class="stat-item">
+                        <div class="stat-icon"><i class="fas fa-users"></i></div>
+                        <div class="stat-data">
+                            <div class="stat-number" id="totalVendedores">0</div>
+                            <div class="stat-label">Vendedores</div>
+                        </div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-icon"><i class="fas fa-chart-line"></i></div>
+                        <div class="stat-data">
+                            <div class="stat-number" id="totalVentas">0</div>
+                            <div class="stat-label">Ventas</div>
+                        </div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-icon"><i class="fas fa-dollar-sign"></i></div>
+                        <div class="stat-data">
+                            <div class="stat-number" id="montoTotal">$0</div>
+                            <div class="stat-label">Total</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="compact-card debug-card">
+                    <h3><i class="fas fa-tools"></i> Herramientas</h3>
+                    <div class="tools-buttons">
+                        <button type="button" id="limpiarTodo" class="btn-danger">
+                            <i class="fas fa-trash"></i> Limpiar
+                        </button>
+                        <button type="button" id="exportarCSV" class="btn-export">
+                            <i class="fas fa-download"></i> CSV
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

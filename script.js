@@ -7,9 +7,12 @@ class SistemaVentas {
         this.periodoActual = 'diario';
         this.intervalosRotacion = null;
         this.contadorRotacion = 60;
+        this.rankingAnterior = {}; // Para trackear tendencias
+        this.puntajesInicioDia = {}; // Para comparar con inicio del día
         this.inicializarAudio();
         this.inicializarEventos();
         this.inicializarRotacion();
+        this.inicializarPuntajesInicioDia();
         this.actualizarInterfaz();
         console.log('SistemaVentas inicializado correctamente');
     }
@@ -131,6 +134,9 @@ class SistemaVentas {
         this.guardarDatos();
         this.actualizarInterfaz();
         
+        // Mostrar toast de vendedor agregado
+        this.mostrarToast(`👤 ${nombre} se unió al equipo de ventas`, 'success');
+        
         nombreInput.value = '';
         
         // Animación de confirmación
@@ -154,6 +160,12 @@ class SistemaVentas {
 
         const vendedor = this.vendedores.find(v => v.id === vendedorId);
         if (vendedor) {
+            // Si es la primera venta del día, actualizar puntajes inicio
+            const ventasHoyAntes = this.calcularVentasDelDia(vendedor);
+            if (ventasHoyAntes.numero === 0 && !this.puntajesInicioDia[vendedorId]) {
+                this.actualizarPuntajesInicioDia();
+            }
+            
             // Agregar venta individual con fecha
             const nuevaVenta = {
                 id: Date.now(),
@@ -173,11 +185,16 @@ class SistemaVentas {
         // Verificar cambios en el podio (usar ranking del período actual)
         const rankingNuevo = this.obtenerRankingPorPeriodo(this.periodoActual).slice(0, 3);
         if (this.hayCambioPodio(rankingAnterior, rankingNuevo)) {
+            // Mostrar toast de cambio de podio
+            this.mostrarToast(`🏆 ¡${vendedor.nombre} cambió posición en el podio!`, 'podium');
+            
             // Esperar un poco antes del sonido de podio
             setTimeout(() => {
                 this.reproducirSonidoCambioPodio();
             }, 800);
         } else {
+            // Mostrar toast de venta normal
+            this.mostrarToast(`🎉 ${vendedor.nombre} registró ${this.formatearMoneda(monto)}`, 'success');
             await this.reproducirSonidoVenta();
         }
 
@@ -216,6 +233,57 @@ class SistemaVentas {
     inicializarRotacion() {
         this.iniciarRotacionAutomatica();
         this.actualizarIndicadorPeriodo();
+    }
+
+    // Inicializar puntajes del inicio del día
+    inicializarPuntajesInicioDia() {
+        const fechaHoy = new Date().toDateString();
+        const clavePuntajes = `puntajesInicioDia_${fechaHoy}`;
+        
+        // Cargar puntajes guardados del día o crearlos
+        const puntajesGuardados = localStorage.getItem(clavePuntajes);
+        
+        if (puntajesGuardados) {
+            this.puntajesInicioDia = JSON.parse(puntajesGuardados);
+            console.log('📊 Puntajes inicio del día cargados:', this.puntajesInicioDia);
+        } else {
+            // Guardar puntajes actuales como inicio del día
+            this.actualizarPuntajesInicioDia();
+        }
+    }
+
+    // Actualizar puntajes del inicio del día
+    actualizarPuntajesInicioDia() {
+        const fechaHoy = new Date().toDateString();
+        const clavePuntajes = `puntajesInicioDia_${fechaHoy}`;
+        
+        this.puntajesInicioDia = {};
+        this.vendedores.forEach(vendedor => {
+            const ventasHoy = this.calcularVentasDelDia(vendedor);
+            this.puntajesInicioDia[vendedor.id] = {
+                ventasTotal: ventasHoy.total,
+                numeroVentas: ventasHoy.numero
+            };
+        });
+        
+        localStorage.setItem(clavePuntajes, JSON.stringify(this.puntajesInicioDia));
+        console.log('📊 Puntajes inicio del día actualizados:', this.puntajesInicioDia);
+    }
+
+    // Calcular ventas del día actual
+    calcularVentasDelDia(vendedor) {
+        const hoy = new Date();
+        const inicioDia = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
+        
+        const ventasHoy = vendedor.ventas.filter(venta => {
+            const fechaVenta = new Date(venta.fecha);
+            return fechaVenta >= inicioDia;
+        });
+        
+        return {
+            total: ventasHoy.reduce((sum, venta) => sum + venta.monto, 0),
+            numero: ventasHoy.length
+        };
     }
 
     // Iniciar rotación automática cada 10 segundos
@@ -369,10 +437,17 @@ class SistemaVentas {
             return;
         }
         
+        // Guardar ranking actual para próxima comparación
+        const rankingActual = {};
+        
         ranking.forEach((vendedor, index) => {
             const fila = document.createElement('tr');
             const posicion = index + 1;
             const promedio = vendedor.numeroVentas > 0 ? vendedor.ventasTotal / vendedor.numeroVentas : 0;
+            
+            // Calcular tendencia
+            const tendencia = this.calcularTendencia(vendedor.id, posicion, periodo);
+            rankingActual[vendedor.id] = posicion;
             
             fila.innerHTML = `
                 <td>
@@ -380,7 +455,10 @@ class SistemaVentas {
                         ${posicion}°
                     </span>
                 </td>
-                <td><strong>${vendedor.nombre}</strong></td>
+                <td>
+                    <strong>${vendedor.nombre}</strong>
+                    ${tendencia}
+                </td>
                 <td><strong>${this.formatearMoneda(vendedor.ventasTotal)}</strong></td>
                 <td>${vendedor.numeroVentas}</td>
                 <td>${this.formatearMoneda(promedio)}</td>
@@ -388,6 +466,64 @@ class SistemaVentas {
             
             tbody.appendChild(fila);
         });
+        
+        // Actualizar ranking anterior solo si hay cambios significativos
+        const hayChangios = this.hayChangiosEnRanking(this.rankingAnterior[periodo], rankingActual);
+        if (hayChangios || !this.rankingAnterior[periodo]) {
+            this.rankingAnterior[periodo] = rankingActual;
+            console.log(`📊 Ranking ${periodo} actualizado con nuevas tendencias`);
+        }
+    }
+
+    // Calcular tendencia (flechas de subida/bajada)
+    calcularTendencia(vendedorId, posicionActual, periodo) {
+        // Para tabla diaria: mostrar monto de la última venta
+        if (periodo === 'diario') {
+            const vendedor = this.vendedores.find(v => v.id === vendedorId);
+            if (!vendedor || !vendedor.ventas || vendedor.ventas.length === 0) return '';
+            
+            // Obtener la última venta
+            const ultimaVenta = vendedor.ventas[vendedor.ventas.length - 1];
+            
+            return `<span class="last-sale">+${this.formatearMoneda(ultimaVenta.monto)}</span>`;
+        }
+        
+        // Para tablas semanal/mensual: comparar cambio de posición
+        else {
+            const posicionAnterior = this.rankingAnterior[periodo]?.[vendedorId];
+            
+            if (!posicionAnterior) {
+                return '<span class="trend-new">🆕</span>'; // Nuevo en ranking
+            }
+            
+            if (posicionActual < posicionAnterior) {
+                const diferencia = posicionAnterior - posicionActual;
+                return `<span class="trend-up">↗️ +${diferencia}</span>`;
+            } else if (posicionActual > posicionAnterior) {
+                const diferencia = posicionActual - posicionAnterior;
+                return `<span class="trend-down">↘️ -${diferencia}</span>`;
+            } else {
+                return ''; // Sin indicador si no hay movimiento
+            }
+        }
+    }
+
+    // Verificar si hay cambios en el ranking
+    hayChangiosEnRanking(rankingAnterior, rankingActual) {
+        if (!rankingAnterior) return true;
+        
+        // Comparar posiciones
+        for (const vendedorId in rankingActual) {
+            if (rankingAnterior[vendedorId] !== rankingActual[vendedorId]) {
+                return true;
+            }
+        }
+        
+        // Verificar vendedores nuevos o eliminados
+        const vendedoresAnteriores = Object.keys(rankingAnterior);
+        const vendedoresActuales = Object.keys(rankingActual);
+        
+        return vendedoresAnteriores.length !== vendedoresActuales.length;
     }
 
     // Obtener ranking filtrado por período
@@ -467,6 +603,46 @@ class SistemaVentas {
             currency: 'CLP',
             minimumFractionDigits: 0
         }).format(monto);
+    }
+
+    // Mostrar toast notification elegante
+    mostrarToast(mensaje, tipo = 'success') {
+        // Crear elemento toast
+        const toast = document.createElement('div');
+        toast.className = `toast toast-${tipo}`;
+        toast.innerHTML = `
+            <div class="toast-content">
+                <span class="toast-message">${mensaje}</span>
+                <button class="toast-close" onclick="this.parentElement.parentElement.remove()">×</button>
+            </div>
+        `;
+        
+        // Agregar al DOM
+        let container = document.getElementById('toast-container');
+        if (!container) {
+            container = document.createElement('div');
+            container.id = 'toast-container';
+            document.body.appendChild(container);
+        }
+        
+        container.appendChild(toast);
+        
+        // Animar entrada
+        setTimeout(() => {
+            toast.classList.add('toast-show');
+        }, 10);
+        
+        // Auto-remover después de 4 segundos
+        setTimeout(() => {
+            toast.classList.add('toast-hide');
+            setTimeout(() => {
+                if (toast.parentElement) {
+                    toast.remove();
+                }
+            }, 300);
+        }, 4000);
+        
+        console.log(`📢 Toast mostrado: ${mensaje}`);
     }
 
     // Guardar datos en localStorage

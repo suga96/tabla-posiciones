@@ -13,6 +13,7 @@ class SistemaVentas {
         this.inicializarEventos();
         this.inicializarRotacion();
         this.inicializarPuntajesInicioDia();
+        this.verificarNuevoDia();
         this.actualizarInterfaz();
         console.log('SistemaVentas inicializado correctamente');
     }
@@ -86,6 +87,21 @@ class SistemaVentas {
         // Botón de exportar CSV
         document.getElementById('exportarCSV').addEventListener('click', () => {
             this.exportarCSV();
+        });
+
+        // Botón de recalcular inicio del día
+        document.getElementById('recalcularInicioDia').addEventListener('click', () => {
+            this.forzarRecalculoInicioDia();
+        });
+
+        // Botón toggle para mostrar/ocultar herramientas
+        document.getElementById('toggleTools').addEventListener('click', () => {
+            this.toggleHerramientas();
+        });
+
+        // Botón cerrar herramientas
+        document.getElementById('closeTools').addEventListener('click', () => {
+            this.cerrarHerramientas();
         });
 
         // Inicializar contexto de audio en primera interacción
@@ -250,6 +266,32 @@ class SistemaVentas {
             // Guardar puntajes actuales como inicio del día
             this.actualizarPuntajesInicioDia();
         }
+        
+        // Inicializar rankings del inicio del día si no existen
+        if (!this.puntajesInicioDia.rankings) {
+            console.log('🔄 No hay rankings de inicio del día, inicializando...');
+            this.puntajesInicioDia.rankings = {};
+            // Si no hay rankings guardados, calcularlos ahora
+            ['semanal', 'mensual'].forEach(periodo => {
+                const ranking = this.obtenerRankingPorPeriodo(periodo);
+                const rankingPosiciones = {};
+                
+                ranking.forEach((vendedor, index) => {
+                    rankingPosiciones[vendedor.id] = index + 1;
+                });
+                
+                this.puntajesInicioDia.rankings[periodo] = rankingPosiciones;
+                console.log(`📊 Ranking ${periodo} inicializado:`, rankingPosiciones);
+            });
+            
+            // Guardar los rankings inicializados
+            const fechaHoy = new Date().toDateString();
+            const clavePuntajes = `puntajesInicioDia_${fechaHoy}`;
+            localStorage.setItem(clavePuntajes, JSON.stringify(this.puntajesInicioDia));
+            console.log('📊 Rankings del inicio del día inicializados y guardados:', this.puntajesInicioDia.rankings);
+        } else {
+            console.log('📊 Rankings de inicio del día ya existían:', this.puntajesInicioDia.rankings);
+        }
     }
 
     // Actualizar puntajes del inicio del día
@@ -257,13 +299,29 @@ class SistemaVentas {
         const fechaHoy = new Date().toDateString();
         const clavePuntajes = `puntajesInicioDia_${fechaHoy}`;
         
-        this.puntajesInicioDia = {};
+        this.puntajesInicioDia = {
+            rankings: {}
+        };
+        
+        // Guardar puntajes individuales por vendedor
         this.vendedores.forEach(vendedor => {
             const ventasHoy = this.calcularVentasDelDia(vendedor);
             this.puntajesInicioDia[vendedor.id] = {
                 ventasTotal: ventasHoy.total,
                 numeroVentas: ventasHoy.numero
             };
+        });
+        
+        // Guardar rankings por período al inicio del día
+        ['semanal', 'mensual'].forEach(periodo => {
+            const ranking = this.obtenerRankingPorPeriodo(periodo);
+            const rankingPosiciones = {};
+            
+            ranking.forEach((vendedor, index) => {
+                rankingPosiciones[vendedor.id] = index + 1;
+            });
+            
+            this.puntajesInicioDia.rankings[periodo] = rankingPosiciones;
         });
         
         localStorage.setItem(clavePuntajes, JSON.stringify(this.puntajesInicioDia));
@@ -488,22 +546,36 @@ class SistemaVentas {
             return `<span class="last-sale">+${this.formatearMoneda(ultimaVenta.monto)}</span>`;
         }
         
-        // Para tablas semanal/mensual: comparar cambio de posición
+        // Para tablas semanal/mensual: comparar con posición del inicio del día
         else {
-            const posicionAnterior = this.rankingAnterior[periodo]?.[vendedorId];
+            // Usar posición del inicio del día en lugar del último movimiento
+            // Esto permite mostrar el cambio real desde el inicio del día, no solo el último cambio
+            const posicionInicioDia = this.puntajesInicioDia?.rankings?.[periodo]?.[vendedorId];
             
-            if (!posicionAnterior) {
+            // Debug: Log para verificar los datos (solo si está habilitado el debug)
+            if (localStorage.getItem('debugTendencias') === 'true') {
+                console.log(`🔍 [DEBUG] Tendencia ${periodo} - Vendedor ID: ${vendedorId}`);
+                console.log(`🔍 [DEBUG] Posición actual: ${posicionActual}`);
+                console.log(`🔍 [DEBUG] Posición inicio día: ${posicionInicioDia}`);
+                console.log(`🔍 [DEBUG] Puntajes inicio día completos:`, this.puntajesInicioDia);
+            }
+            
+            if (!posicionInicioDia) {
+                console.log(`🔍 [DEBUG] Vendedor nuevo en ranking ${periodo}`);
                 return '<span class="trend-new">🆕</span>'; // Nuevo en ranking
             }
             
-            if (posicionActual < posicionAnterior) {
-                const diferencia = posicionAnterior - posicionActual;
+            if (posicionActual < posicionInicioDia) {
+                const diferencia = posicionInicioDia - posicionActual;
+                console.log(`🔍 [DEBUG] Tendencia SUBIDA: +${diferencia} posiciones`);
                 return `<span class="trend-up">↗️ +${diferencia}</span>`;
-            } else if (posicionActual > posicionAnterior) {
-                const diferencia = posicionActual - posicionAnterior;
+            } else if (posicionActual > posicionInicioDia) {
+                const diferencia = posicionActual - posicionInicioDia;
+                console.log(`🔍 [DEBUG] Tendencia BAJADA: -${diferencia} posiciones`);
                 return `<span class="trend-down">↘️ -${diferencia}</span>`;
             } else {
-                return ''; // Sin indicador si no hay movimiento
+                console.log(`🔍 [DEBUG] Sin cambio de posición`);
+                return ''; // Sin indicador si no hay movimiento desde el inicio del día
             }
         }
     }
@@ -835,6 +907,181 @@ class SistemaVentas {
         }
     }
 
+    // Verificar si es un nuevo día y actualizar puntajes automáticamente
+    verificarNuevoDia() {
+        const fechaHoy = new Date().toDateString();
+        const ultimaFechaVerificada = localStorage.getItem('ultimaFechaVerificada');
+        
+        console.log('🗓️ Verificando nuevo día...');
+        console.log(`🗓️ Fecha hoy: ${fechaHoy}`);
+        console.log(`🗓️ Última fecha verificada: ${ultimaFechaVerificada}`);
+        
+        // Si es un día diferente, forzar actualización de puntajes
+        if (ultimaFechaVerificada !== fechaHoy) {
+            console.log('🆕 ¡Nuevo día detectado! Actualizando puntajes de inicio...');
+            
+            // Actualizar puntajes para el nuevo día
+            this.actualizarPuntajesInicioDia();
+            
+            // Guardar la fecha actual como última verificada
+            localStorage.setItem('ultimaFechaVerificada', fechaHoy);
+            
+            console.log('✅ Puntajes de inicio actualizados para el nuevo día');
+        } else {
+            console.log('📅 Mismo día, manteniendo puntajes de inicio existentes');
+        }
+    }
+
+    // Mostrar panel de herramientas (solo abrir)
+    toggleHerramientas() {
+        const toolsPanel = document.getElementById('toolsPanel');
+        const toggleBtn = document.getElementById('toggleTools');
+        
+        // Solo mostrar si está oculto
+        if (toolsPanel.style.display === 'none' || !toolsPanel.style.display) {
+            // Mostrar panel
+            toolsPanel.style.display = 'block';
+            toolsPanel.classList.remove('hide');
+            toolsPanel.classList.add('show');
+            
+            // Ocultar botón flotante
+            toggleBtn.classList.add('hidden');
+            
+            console.log('🔧 Panel de herramientas mostrado');
+        }
+    }
+
+    // Cerrar panel de herramientas
+    cerrarHerramientas() {
+        const toolsPanel = document.getElementById('toolsPanel');
+        const toggleBtn = document.getElementById('toggleTools');
+        
+        // Ocultar panel
+        toolsPanel.classList.remove('show');
+        toolsPanel.classList.add('hide');
+        
+        // Mostrar botón flotante
+        toggleBtn.classList.remove('hidden');
+        
+        // Ocultar después de la animación
+        setTimeout(() => {
+            toolsPanel.style.display = 'none';
+            toolsPanel.classList.remove('hide');
+        }, 300);
+        
+        console.log('🔧 Panel de herramientas ocultado');
+    }
+
+    // Calcular cómo estaba el ranking a las 00:01 del día actual
+    calcularRankingA0001() {
+        const hoy = new Date();
+        const inicio0001 = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate(), 0, 1, 0); // 00:01 de hoy
+        
+        console.log(`🕐 Calculando ranking a las 00:01 del ${inicio0001.toLocaleDateString()}`);
+        
+        const rankingsPorPeriodo = {};
+        
+        ['semanal', 'mensual'].forEach(periodo => {
+            // Calcular fecha de inicio del período
+            let fechaInicioPeriodo;
+            switch (periodo) {
+                case 'semanal':
+                    fechaInicioPeriodo = new Date(hoy);
+                    fechaInicioPeriodo.setDate(hoy.getDate() - hoy.getDay()); // Domingo de esta semana
+                    fechaInicioPeriodo.setHours(0, 0, 0, 0);
+                    break;
+                case 'mensual':
+                    fechaInicioPeriodo = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+                    break;
+            }
+            
+            // Calcular ranking considerando solo ventas hasta las 00:01 de hoy
+            const rankingA0001 = this.vendedores.map(vendedor => {
+                // Filtrar ventas del período que ocurrieron antes de las 00:01 de hoy
+                const ventasPeriodoHasta0001 = vendedor.ventas.filter(venta => {
+                    const fechaVenta = new Date(venta.fecha);
+                    return fechaVenta >= fechaInicioPeriodo && fechaVenta < inicio0001;
+                });
+                
+                // Calcular totales hasta las 00:01
+                const ventasTotal = ventasPeriodoHasta0001.reduce((sum, venta) => sum + venta.monto, 0);
+                const numeroVentas = ventasPeriodoHasta0001.length;
+                
+                return {
+                    id: vendedor.id,
+                    nombre: vendedor.nombre,
+                    ventasTotal: ventasTotal,
+                    numeroVentas: numeroVentas
+                };
+            })
+            .filter(v => v.ventasTotal > 0) // Solo vendedores con ventas en el período
+            .sort((a, b) => b.ventasTotal - a.ventasTotal);
+            
+            // Convertir a objeto de posiciones
+            const posiciones = {};
+            rankingA0001.forEach((vendedor, index) => {
+                posiciones[vendedor.id] = index + 1;
+            });
+            
+            rankingsPorPeriodo[periodo] = posiciones;
+            console.log(`📊 Ranking ${periodo} a las 00:01:`, posiciones);
+        });
+        
+        return rankingsPorPeriodo;
+    }
+
+    // Establecer como referencia las posiciones que había a las 00:01 de hoy
+    forzarRecalculoInicioDia() {
+        console.log('🔄 Calculando referencia basada en posiciones a las 00:01 de hoy...');
+        
+        // Mostrar confirmación al usuario
+        if (confirm('🕐 ¿Calcular referencia basada en las 00:01 de hoy?\n\n• Se reconstruirá cómo estaban las posiciones a las 00:01\n• Las tendencias se basarán en esas posiciones históricas\n• No afecta las posiciones actuales\n\n¿Continuar?')) {
+            
+            try {
+                // Calcular rankings a las 00:01
+                const rankingsA0001 = this.calcularRankingA0001();
+                
+                // Actualizar los puntajes de inicio del día con los rankings calculados
+                const fechaHoy = new Date().toDateString();
+                const clavePuntajes = `puntajesInicioDia_${fechaHoy}`;
+                
+                // Mantener los puntajes individuales existentes pero actualizar rankings
+                if (!this.puntajesInicioDia.rankings) {
+                    this.puntajesInicioDia.rankings = {};
+                }
+                
+                // Establecer los rankings calculados a las 00:01
+                this.puntajesInicioDia.rankings = rankingsA0001;
+                
+                // Guardar en localStorage
+                localStorage.setItem(clavePuntajes, JSON.stringify(this.puntajesInicioDia));
+                
+                // Actualizar la interfaz para mostrar los nuevos datos
+                this.actualizarInterfaz();
+                
+                // Mostrar feedback visual
+                const btn = document.getElementById('recalcularInicioDia');
+                const originalText = btn.innerHTML;
+                btn.innerHTML = '<i class="fas fa-check"></i> ¡Calculado!';
+                btn.style.background = 'linear-gradient(135deg, #10b981 0%, #059669 100%)';
+                
+                setTimeout(() => {
+                    btn.innerHTML = originalText;
+                    btn.style.background = '';
+                }, 2000);
+                
+                // Mostrar toast de confirmación
+                this.mostrarToast('🕐 Referencia establecida basada en las 00:01', 'success');
+                
+                console.log('✅ Referencia 00:01 establecida. Rankings de referencia:', this.puntajesInicioDia.rankings);
+                
+            } catch (error) {
+                console.error('❌ Error calculando referencia 00:01:', error);
+                this.mostrarToast('❌ Error calculando referencia de las 00:01', 'danger');
+            }
+        }
+    }
+
     // Método para limpiar todos los datos (útil para testing)
     limpiarDatos() {
         if (confirm('¿Está seguro que desea eliminar todos los datos? Esta acción no se puede deshacer.')) {
@@ -851,7 +1098,18 @@ document.addEventListener('DOMContentLoaded', () => {
    
 });
 
-// Funciones de utilidad global
+// Funciones de utilidad global y debug
+window.habilitarDebugTendencias = function() {
+    localStorage.setItem('debugTendencias', 'true');
+    console.log('🔍 Debug de tendencias HABILITADO');
+    console.log('💡 Ahora verás logs detallados de cálculo de tendencias');
+};
+
+window.deshabilitarDebugTendencias = function() {
+    localStorage.setItem('debugTendencias', 'false');
+    console.log('🔍 Debug de tendencias DESHABILITADO');
+};
+
 window.exportarDatos = function() {
     const datos = {
         vendedores: window.sistemaVentas.vendedores,

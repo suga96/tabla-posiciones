@@ -152,9 +152,23 @@
                         </div>
                     </div>
                 </div>
-                <div class="compact-card debug-card">
-                    <h3><i class="fas fa-tools"></i> Herramientas</h3>
+                <!-- Botón toggle para herramientas -->
+                <button type="button" id="toggleTools" class="toggle-tools-btn">
+                    <i class="fas fa-tools"></i>
+                </button>
+
+                <!-- Panel de herramientas (oculto por defecto) -->
+                <div class="compact-card debug-card tools-panel" id="toolsPanel" style="display: none;">
+                    <div class="tools-header">
+                        <h3><i class="fas fa-tools"></i> Herramientas</h3>
+                        <button type="button" id="closeTools" class="close-tools-btn">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
                     <div class="tools-buttons">
+                        <button type="button" id="recalcularInicioDia" class="btn-recalc">
+                            <i class="fas fa-clock"></i> Ref. 00:01
+                        </button>
                         <button type="button" id="limpiarTodo" class="btn-danger">
                             <i class="fas fa-trash"></i> Limpiar
                         </button>

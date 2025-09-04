@@ -873,21 +873,21 @@ tbody tr:nth-child(3) td:nth-child(3) {
         font-size: 1rem;
     }
     
-    /* Layout móvil: Sidebar arriba, tabla abajo */
+    /* Layout móvil: Tabla arriba (prioridad), sidebar abajo */
     .tv-layout {
         flex-direction: column;
         gap: 1.5rem;
         height: auto;
     }
     
-    .tv-sidebar {
-        order: -1; /* Sidebar al inicio */
-        width: 100%;
-        flex-direction: column;
+    .ranking-section {
+        order: -1; /* Tabla al inicio - PRIORIDAD */
     }
     
-    .ranking-section {
-        order: 1;
+    .tv-sidebar {
+        order: 1; /* Sidebar al final */
+        width: 100%;
+        flex-direction: column;
     }
     
     /* Controles móviles más grandes */

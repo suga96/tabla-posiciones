@@ -18,6 +18,18 @@ class SistemaVentas {
         console.log('SistemaVentas inicializado correctamente');
     }
 
+    // Duración de visualización por período (segundos)
+    getDuracionPeriodo(periodo) {
+        const duraciones = {
+            'diario': 60,
+            'semanal': 50,
+            'mensual': 40,
+            'anual': 30,
+            'todas': 20
+        };
+        return duraciones[periodo] || 60;
+    }
+
     // Inicialización del contexto de audio
     inicializarAudio() {
         try {
@@ -89,6 +101,21 @@ class SistemaVentas {
             this.exportarCSV();
         });
 
+        // Botón de importar CSV -> abre selector
+        const btnImportar = document.getElementById('importarCSV');
+        const inputCSV = document.getElementById('inputCSV');
+        if (btnImportar && inputCSV) {
+            btnImportar.addEventListener('click', () => inputCSV.click());
+            inputCSV.addEventListener('change', (e) => {
+                const file = e.target.files && e.target.files[0];
+                if (file) {
+                    this.importarDesdeCSV(file);
+                }
+                // Permitir volver a seleccionar el mismo archivo después
+                e.target.value = '';
+            });
+        }
+
         // Botón de recalcular inicio del día
         document.getElementById('recalcularInicioDia').addEventListener('click', () => {
             this.forzarRecalculoInicioDia();
@@ -159,6 +186,160 @@ class SistemaVentas {
         const form = document.getElementById('vendedorForm');
         form.classList.add('animate-pulse');
         setTimeout(() => form.classList.remove('animate-pulse'), 600);
+    }
+
+    // === Importar datos desde CSV ===
+    importarDesdeCSV(file) {
+        try {
+            const reader = new FileReader();
+            const btn = document.getElementById('importarCSV');
+            const originalHTML = btn ? btn.innerHTML : '';
+            if (btn) btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Importando...';
+
+            reader.onload = (e) => {
+                try {
+                    const texto = e.target.result;
+                    const { headers, rows } = this.parsearCSV(texto);
+                    if (!rows || rows.length === 0) {
+                        alert('El CSV no contiene filas válidas');
+                        if (btn) btn.innerHTML = originalHTML;
+                        return;
+                    }
+
+                    let vendedoresCreados = 0;
+                    let ventasCreadas = 0;
+
+                    // Mapear nombre de columnas comunes
+                    const findCol = (candidatos) => candidatos.find(h => headers.includes(h));
+                    const colNombre = findCol(['Nombre_Vendedor','nombre_vendedor','Vendedor','vendedor','Nombre','nombre']);
+                    const colMonto = findCol(['Monto_Venta','monto_venta','Monto','monto','venta']);
+                    const colFechaVenta = findCol(['Fecha_Venta','fecha_venta','Fecha','fecha']);
+                    const colFechaRegistro = findCol(['Fecha_Registro','fecha_registro']);
+                    const colAnio = findCol(['Año','anio','year']);
+                    const colMes = findCol(['Mes','mes','month']);
+                    const colDia = findCol(['Dia','día','dia','day']);
+                    const colHora = findCol(['Hora','hora','hour']);
+
+                    const nombreAId = new Map(this.vendedores.map(v => [v.nombre.toLowerCase(), v.id]));
+
+                    rows.forEach((row, idx) => {
+                        const nombre = (colNombre ? row[colNombre] : '').trim();
+                        if (!nombre) return; // saltar filas sin nombre
+
+                        // buscar o crear vendedor
+                        let vendedor = this.vendedores.find(v => v.nombre.toLowerCase() === nombre.toLowerCase());
+                        if (!vendedor) {
+                            vendedor = {
+                                id: Date.now() + idx,
+                                nombre: nombre,
+                                ventas: [],
+                                fechaRegistro: (colFechaRegistro && row[colFechaRegistro]) ? new Date(row[colFechaRegistro]).toISOString() : new Date().toISOString()
+                            };
+                            this.vendedores.push(vendedor);
+                            nombreAId.set(nombre.toLowerCase(), vendedor.id);
+                            vendedoresCreados++;
+                        }
+
+                        // monto de la venta (opcional); si no hay, puede ser fila solo de vendedor
+                        let monto = 0;
+                        if (colMonto && row[colMonto] !== undefined && row[colMonto] !== null && String(row[colMonto]).trim() !== '') {
+                            const normalizado = String(row[colMonto]).replace(/\./g,'').replace(',', '.');
+                            const parsed = parseFloat(normalizado);
+                            if (!isNaN(parsed) && parsed > 0) {
+                                monto = parsed;
+                            }
+                        }
+
+                        if (monto > 0) {
+                            // fecha de la venta
+                            let fechaVenta = new Date();
+                            if (colFechaVenta && row[colFechaVenta]) {
+                                const f = new Date(row[colFechaVenta]);
+                                if (!isNaN(f.getTime())) fechaVenta = f;
+                            } else if (colAnio && colMes && colDia && (row[colAnio] || row[colMes] || row[colDia])) {
+                                const y = parseInt(row[colAnio]) || new Date().getFullYear();
+                                const m = (parseInt(row[colMes]) || (new Date().getMonth()+1)) - 1; // 0-11
+                                const d = parseInt(row[colDia]) || new Date().getDate();
+                                const h = colHora && row[colHora] ? parseInt(row[colHora]) : 12;
+                                const f = new Date(y, m, d, h, 0, 0, 0);
+                                if (!isNaN(f.getTime())) fechaVenta = f;
+                            }
+
+                            vendedor.ventas.push({
+                                id: Date.now() + idx,
+                                monto: monto,
+                                fecha: fechaVenta.toISOString()
+                            });
+                            ventasCreadas++;
+                        }
+                    });
+
+                    this.guardarDatos();
+                    this.actualizarInterfaz();
+                    this.mostrarToast(`📥 CSV importado: ${vendedoresCreados} vendedores, ${ventasCreadas} ventas`, 'success');
+                } catch (err) {
+                    console.error('Error importando CSV:', err);
+                    alert('Error al procesar el CSV. Revise el formato.');
+                } finally {
+                    if (btn) btn.innerHTML = originalHTML;
+                }
+            };
+
+            reader.onerror = () => {
+                alert('No se pudo leer el archivo CSV');
+                if (btn) btn.innerHTML = originalHTML;
+            };
+
+            reader.readAsText(file, 'utf-8');
+        } catch (error) {
+            console.error('Error preparando importación CSV:', error);
+            alert('Error preparando la importación CSV');
+        }
+    }
+
+    // Parser CSV simple con soporte de comillas
+    parsearCSV(texto) {
+        // Normalizar saltos de línea
+        const lines = texto.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n').filter(l => l.trim() !== '');
+        if (lines.length === 0) return { headers: [], rows: [] };
+
+        const parseLine = (line) => {
+            const result = [];
+            let current = '';
+            let inQuotes = false;
+            for (let i = 0; i < line.length; i++) {
+                const char = line[i];
+                if (char === '"') {
+                    if (inQuotes && line[i+1] === '"') { // escape ""
+                        current += '"';
+                        i++;
+                    } else {
+                        inQuotes = !inQuotes;
+                    }
+                } else if (char === ',' && !inQuotes) {
+                    result.push(current);
+                    current = '';
+                } else {
+                    current += char;
+                }
+            }
+            result.push(current);
+            return result.map(v => v.trim());
+        };
+
+        const headerCells = parseLine(lines[0]).map(h => h.trim());
+        const headersLower = headerCells.map(h => h);
+        const rows = [];
+        for (let i = 1; i < lines.length; i++) {
+            const cells = parseLine(lines[i]);
+            if (cells.every(c => c.trim() === '')) continue;
+            const rowObj = {};
+            for (let j = 0; j < headerCells.length; j++) {
+                rowObj[headersLower[j]] = cells[j] !== undefined ? cells[j] : '';
+            }
+            rows.push(rowObj);
+        }
+        return { headers: headerCells, rows };
     }
 
     // Registrar nueva venta
@@ -313,7 +494,7 @@ class SistemaVentas {
         });
         
         // Guardar rankings por período al inicio del día
-        ['semanal', 'mensual'].forEach(periodo => {
+        ['semanal', 'mensual', 'anual', 'todas'].forEach(periodo => {
             const ranking = this.obtenerRankingPorPeriodo(periodo);
             const rankingPosiciones = {};
             
@@ -352,14 +533,16 @@ class SistemaVentas {
         }
 
         // Contador visual
-        this.contadorRotacion = 60;
+        this.contadorRotacion = this.getDuracionPeriodo(this.periodoActual);
+        const rcEl = document.getElementById('rotationCounter');
+        if (rcEl) rcEl.textContent = this.contadorRotacion;
         const contadorInterval = setInterval(() => {
             this.contadorRotacion--;
             document.getElementById('rotationCounter').textContent = this.contadorRotacion;
             
             if (this.contadorRotacion <= 0) {
                 this.siguientePeriodo();
-                this.contadorRotacion = 60;
+                this.contadorRotacion = this.getDuracionPeriodo(this.periodoActual);
             }
         }, 1000);
 
@@ -368,7 +551,7 @@ class SistemaVentas {
 
     // Cambiar al siguiente período
     siguientePeriodo() {
-        const periodos = ['diario', 'semanal', 'mensual'];
+        const periodos = ['diario', 'semanal', 'mensual', 'anual', 'todas'];
         const indexActual = periodos.indexOf(this.periodoActual);
         const siguienteIndex = (indexActual + 1) % periodos.length;
         this.cambiarPeriodo(periodos[siguienteIndex]);
@@ -392,7 +575,9 @@ class SistemaVentas {
         this.actualizarTablaRanking();
 
         // Reiniciar contador
-        this.contadorRotacion = 60;
+        this.contadorRotacion = this.getDuracionPeriodo(this.periodoActual);
+        const rcEl = document.getElementById('rotationCounter');
+        if (rcEl) rcEl.textContent = this.contadorRotacion;
     }
 
     // Animar cambio de tabla
@@ -422,13 +607,18 @@ class SistemaVentas {
         const titulos = {
             'diario': '📊 Ranking Diario',
             'semanal': '📈 Ranking Semanal', 
-            'mensual': '🏆 Ranking Mensual'
+            'mensual': '🏆 Ranking Mensual',
+            'anual': '🎯 Ranking Anual',
+            'todas': '🌐 Ranking Total'
         };
 
+        const ahora = new Date();
         const fechas = {
             'diario': 'Hoy',
             'semanal': 'Esta Semana',
-            'mensual': 'Este Mes'
+            'mensual': 'Este Mes',
+            'anual': `Año ${ahora.getFullYear()}`,
+            'todas': 'Todo el historial'
         };
 
         document.getElementById('currentPeriodTitle').textContent = titulos[this.periodoActual];
@@ -468,6 +658,8 @@ class SistemaVentas {
         this.actualizarTablaPeriodo('diario');
         this.actualizarTablaPeriodo('semanal');
         this.actualizarTablaPeriodo('mensual');
+        this.actualizarTablaPeriodo('anual');
+        this.actualizarTablaPeriodo('todas');
     }
 
     // Actualizar tabla específica por período
@@ -546,7 +738,7 @@ class SistemaVentas {
             return `<span class="last-sale">+${this.formatearMoneda(ultimaVenta.monto)}</span>`;
         }
         
-        // Para tablas semanal/mensual: comparar con posición del inicio del día
+        // Para tablas semanal/mensual/anual/todas: comparar con posición del inicio del día (si aplica)
         else {
             // Usar posición del inicio del día en lugar del último movimiento
             // Esto permite mostrar el cambio real desde el inicio del día, no solo el último cambio
@@ -617,6 +809,12 @@ class SistemaVentas {
                 break;
             case 'mensual':
                 fechaInicio = new Date(ahora.getFullYear(), ahora.getMonth(), 1);
+                break;
+            case 'anual':
+                fechaInicio = new Date(ahora.getFullYear(), 0, 1);
+                break;
+            case 'todas':
+                fechaInicio = new Date(0);
                 break;
             default:
                 // Fallback: mostrar todo
@@ -981,7 +1179,7 @@ class SistemaVentas {
         
         const rankingsPorPeriodo = {};
         
-        ['semanal', 'mensual'].forEach(periodo => {
+        ['semanal', 'mensual', 'anual'].forEach(periodo => {
             // Calcular fecha de inicio del período
             let fechaInicioPeriodo;
             switch (periodo) {
@@ -992,6 +1190,9 @@ class SistemaVentas {
                     break;
                 case 'mensual':
                     fechaInicioPeriodo = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+                    break;
+                case 'anual':
+                    fechaInicioPeriodo = new Date(hoy.getFullYear(), 0, 1);
                     break;
             }
             

@@ -38,6 +38,8 @@
                             <span class="dot active" data-period="diario"></span>
                             <span class="dot" data-period="semanal"></span>
                             <span class="dot" data-period="mensual"></span>
+                            <span class="dot" data-period="anual"></span>
+                            <span class="dot" data-period="todas"></span>
                         </div>
                     </div>
                     <div class="period-info">
@@ -97,6 +99,42 @@
                                 </tr>
                             </thead>
                             <tbody id="rankingBody-mensual">
+                                <!-- Los datos se llenarán dinámicamente -->
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Tabla Anual -->
+                    <div class="table-container" id="tabla-anual">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Pos</th>
+                                    <th>Vendedor</th>
+                                    <th>Ventas Año</th>
+                                    <th>N° Ventas</th>
+                                    <th>Promedio</th>
+                                </tr>
+                            </thead>
+                            <tbody id="rankingBody-anual">
+                                <!-- Los datos se llenarán dinámicamente -->
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Tabla Todas (sin límite) -->
+                    <div class="table-container" id="tabla-todas">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Pos</th>
+                                    <th>Vendedor</th>
+                                    <th>Ventas Totales</th>
+                                    <th>N° Ventas</th>
+                                    <th>Promedio</th>
+                                </tr>
+                            </thead>
+                            <tbody id="rankingBody-todas">
                                 <!-- Los datos se llenarán dinámicamente -->
                             </tbody>
                         </table>
@@ -176,10 +214,14 @@
                         <button type="button" id="limpiarTodo" class="btn-danger">
                             <i class="fas fa-trash"></i> Limpiar
                         </button>
+                        <button type="button" id="importarCSV" class="btn-export">
+                            <i class="fas fa-upload"></i> Importar CSV
+                        </button>
                         <button type="button" id="exportarCSV" class="btn-export">
                             <i class="fas fa-download"></i> CSV
                         </button>
                     </div>
+                    <input type="file" id="inputCSV" accept=".csv" style="display:none" />
                 </div>
             </div>
         </div>

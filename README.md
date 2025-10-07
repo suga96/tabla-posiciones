@@ -1,4 +1,4 @@
-#Pagina de Prueba
+# Pagina de Prueba
 https://suga96.github.io/tabla-posiciones/
 
 # 🏆 Sistema de Tabla de Posiciones para Vendedores

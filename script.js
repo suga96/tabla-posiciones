@@ -353,7 +353,7 @@ class SistemaVentas {
         }
 
         // Obtener rankings anteriores para detectar cambios en podio (todas las tablas excepto diario)
-        const periodosParaVerificar = ['semanal', 'mensual', 'anual', 'todas'];
+        const periodosParaVerificar = ['todas', 'anual', 'mensual', 'semanal'];
         const rankingsAnteriores = {};
         periodosParaVerificar.forEach(periodo => {
             rankingsAnteriores[periodo] = this.obtenerRankingPorPeriodo(periodo).slice(0, 3);

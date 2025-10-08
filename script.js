@@ -61,14 +61,14 @@ class SistemaVentas {
     // Reproducir sonido de campeón desde archivo MP3
     async reproducirSonidoCambioPodio() {
         try {
-            const audio = new Audio('champ.mp3');
+            const audio = new Audio('Champ.mp3');
             audio.volume = 0.8; // Volumen al 80% (más alto para el campeón)
             await audio.play();
         } catch (error) {
             console.warn('Error reproduciendo sonido de campeón:', error);
             // Fallback: intentar con ruta alternativa
             try {
-                const audio = new Audio('./champ.mp3');
+                const audio = new Audio('./Champ.mp3');
                 audio.volume = 0.8;
                 await audio.play();
             } catch (fallbackError) {

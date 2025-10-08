@@ -742,8 +742,18 @@ class SistemaVentas {
         else {
             // Usar posición del inicio del día en lugar del último movimiento
             // Esto permite mostrar el cambio real desde el inicio del día, no solo el último cambio
-            const posicionInicioDia = this.puntajesInicioDia?.rankings?.[periodo]?.[vendedorId];
-            
+            const mapaPeriodo = this.puntajesInicioDia?.rankings?.[periodo];
+
+            // Si no hay referencia para el período, no mostrar indicador para evitar falsos "🆕"
+            if (!mapaPeriodo) {
+                if (localStorage.getItem('debugTendencias') === 'true') {
+                    console.log(`🔍 [DEBUG] No hay mapa de referencia para período ${periodo}`);
+                }
+                return '';
+            }
+
+            const posicionInicioDia = mapaPeriodo[vendedorId];
+
             // Debug: Log para verificar los datos (solo si está habilitado el debug)
             if (localStorage.getItem('debugTendencias') === 'true') {
                 console.log(`🔍 [DEBUG] Tendencia ${periodo} - Vendedor ID: ${vendedorId}`);
@@ -751,12 +761,15 @@ class SistemaVentas {
                 console.log(`🔍 [DEBUG] Posición inicio día: ${posicionInicioDia}`);
                 console.log(`🔍 [DEBUG] Puntajes inicio día completos:`, this.puntajesInicioDia);
             }
-            
-            if (!posicionInicioDia) {
-                console.log(`🔍 [DEBUG] Vendedor nuevo en ranking ${periodo}`);
-                return '<span class="trend-new">🆕</span>'; // Nuevo en ranking
+
+            // Si sí hay mapa pero el vendedor no estaba en el ranking de referencia, entonces es nuevo
+            if (posicionInicioDia === undefined) {
+                if (localStorage.getItem('debugTendencias') === 'true') {
+                    console.log(`🔍 [DEBUG] Vendedor nuevo en ranking ${periodo}`);
+                }
+                return '<span class="trend-new">🆕</span>';
             }
-            
+
             if (posicionActual < posicionInicioDia) {
                 const diferencia = posicionInicioDia - posicionActual;
                 console.log(`🔍 [DEBUG] Tendencia SUBIDA: +${diferencia} posiciones`);

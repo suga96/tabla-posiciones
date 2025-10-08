@@ -452,8 +452,8 @@ class SistemaVentas {
         if (!this.puntajesInicioDia.rankings) {
             console.log('🔄 No hay rankings de inicio del día, inicializando...');
             this.puntajesInicioDia.rankings = {};
-            // Si no hay rankings guardados, calcularlos ahora
-            ['semanal', 'mensual'].forEach(periodo => {
+            // Si no hay rankings guardados, calcularlos ahora (incluye anual y total)
+            ['semanal', 'mensual', 'anual', 'todas'].forEach(periodo => {
                 const ranking = this.obtenerRankingPorPeriodo(periodo);
                 const rankingPosiciones = {};
                 
@@ -1179,7 +1179,7 @@ class SistemaVentas {
         
         const rankingsPorPeriodo = {};
         
-        ['semanal', 'mensual', 'anual'].forEach(periodo => {
+        ['semanal', 'mensual', 'anual', 'todas'].forEach(periodo => {
             // Calcular fecha de inicio del período
             let fechaInicioPeriodo;
             switch (periodo) {
@@ -1193,6 +1193,9 @@ class SistemaVentas {
                     break;
                 case 'anual':
                     fechaInicioPeriodo = new Date(hoy.getFullYear(), 0, 1);
+                    break;
+                case 'todas':
+                    fechaInicioPeriodo = new Date(0);
                     break;
             }
             

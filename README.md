@@ -1,3 +1,6 @@
+# Pagina de Prueba
+https://suga96.github.io/tabla-posiciones/
+
 # 🏆 Sistema de Tabla de Posiciones para Vendedores
 
 Una aplicación web moderna y profesional para gestionar el ranking de vendedores con efectos de sonido y diseño empresarial.

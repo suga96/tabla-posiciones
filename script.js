@@ -352,8 +352,12 @@ class SistemaVentas {
             return;
         }
 
-        // Obtener ranking anterior para detectar cambios en podio
-        const rankingAnterior = this.obtenerRankingPorPeriodo(this.periodoActual).slice(0, 3);
+        // Obtener rankings anteriores para detectar cambios en podio (todas las tablas excepto diario)
+        const periodosParaVerificar = ['semanal', 'mensual', 'anual', 'todas'];
+        const rankingsAnteriores = {};
+        periodosParaVerificar.forEach(periodo => {
+            rankingsAnteriores[periodo] = this.obtenerRankingPorPeriodo(periodo).slice(0, 3);
+        });
 
         const vendedor = this.vendedores.find(v => v.id === vendedorId);
         if (vendedor) {
@@ -379,18 +383,30 @@ class SistemaVentas {
 
         this.guardarDatos();
         
-        // Verificar cambios en el podio (usar ranking del período actual)
-        const rankingNuevo = this.obtenerRankingPorPeriodo(this.periodoActual).slice(0, 3);
-        if (this.hayCambioPodio(rankingAnterior, rankingNuevo)) {
+        // Verificar cambios en el podio de todas las tablas (excepto diario)
+        let tablaConCambio = null;
+        for (const periodo of periodosParaVerificar) {
+            const rankingNuevo = this.obtenerRankingPorPeriodo(periodo).slice(0, 3);
+            if (this.hayCambioPodio(rankingsAnteriores[periodo], rankingNuevo)) {
+                tablaConCambio = periodo;
+                console.log(`🏆 Cambio de podio detectado en tabla ${periodo}`);
+                break; // Tomar la primera tabla que tenga cambio
+            }
+        }
+
+        if (tablaConCambio) {
+            // Si hay cambio en alguna tabla, cambiar a esa tabla y reproducir sonido de campeón
+            this.cambiarPeriodo(tablaConCambio);
+            
             // Mostrar toast de cambio de podio
-            this.mostrarToast(`🏆 ¡${vendedor.nombre} cambió posición en el podio!`, 'podium');
+            this.mostrarToast(`🏆 ¡${vendedor.nombre} cambió posición en el podio ${tablaConCambio}!`, 'podium');
             
             // Esperar un poco antes del sonido de podio
             setTimeout(() => {
                 this.reproducirSonidoCambioPodio();
             }, 800);
         } else {
-            // Mostrar toast de venta normal
+            // Si no hay cambio en ninguna tabla, sonido normal y mantener tabla actual
             this.mostrarToast(`🎉 ${vendedor.nombre} registró ${this.formatearMoneda(monto)}`, 'success');
             await this.reproducirSonidoVenta();
         }

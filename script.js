@@ -1299,50 +1299,6 @@ document.addEventListener('DOMContentLoaded', () => {
    
 });
 
-// Mantener la pantalla activa (Wake Lock) mientras la app esté visible
-(function () {
-    let wakeLock = null;
-
-    async function requestWakeLock() {
-        try {
-            wakeLock = await navigator.wakeLock.request('screen');
-            wakeLock.addEventListener('release', () => {
-                console.log('Wake Lock liberado');
-            });
-            console.log('Wake Lock activo');
-        } catch (err) {
-            console.warn('No se pudo activar Wake Lock:', err);
-        }
-    }
-
-    // Solicitar al cargar y reintentar al volver a ser visible
-    window.addEventListener('load', () => {
-        if ('wakeLock' in navigator) {
-            requestWakeLock();
-        } else {
-            console.warn('Wake Lock API no soportada en este navegador');
-        }
-    });
-
-    document.addEventListener('visibilitychange', () => {
-        if (document.visibilityState === 'visible' && 'wakeLock' in navigator) {
-            requestWakeLock();
-        }
-    });
-
-    // En algunos navegadores móviles, al ocultar la página conviene liberar
-    window.addEventListener('pagehide', () => {
-        try {
-            if (wakeLock && typeof wakeLock.release === 'function') {
-                wakeLock.release();
-                wakeLock = null;
-            }
-        } catch (e) {
-            // noop
-        }
-    });
-})();
-
 // Funciones de utilidad global y debug
 window.habilitarDebugTendencias = function() {
     localStorage.setItem('debugTendencias', 'true');

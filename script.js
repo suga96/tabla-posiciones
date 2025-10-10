@@ -10,6 +10,7 @@ class SistemaVentas {
         this.rankingAnterior = {}; // Para trackear tendencias
         this.puntajesInicioDia = {}; // Para comparar con inicio del día
         this.archivoSyncSeleccionado = null; // Archivo seleccionado para sincronización
+        this.archivoSyncPersistente = null; // Ruta del archivo persistente
         this.inicializarAudio();
         this.inicializarEventos();
         this.inicializarRotacion();
@@ -147,8 +148,8 @@ class SistemaVentas {
                     if (archivoSeleccionado) archivoSeleccionado.style.display = 'block';
                     if (btnEjecutarSync) btnEjecutarSync.disabled = false;
                     
-                    // Guardar archivo persistentemente
-                    this.guardarArchivoSyncPersistente(file);
+                    // Guardar ruta del archivo persistentemente
+                    this.guardarRutaArchivoSync(file);
                     
                     this.mostrarToast(`📁 Archivo seleccionado: ${file.name}`, 'success');
                 }
@@ -380,6 +381,17 @@ class SistemaVentas {
 
     // Ejecutar sincronización con archivo previamente seleccionado
     ejecutarSincronizacion() {
+        // Si hay archivo persistente pero no cargado, pedir al usuario que lo seleccione
+        if (!this.archivoSyncSeleccionado && this.archivoSyncPersistente) {
+            this.mostrarToast(`📁 Por favor, selecciona nuevamente el archivo: ${this.archivoSyncPersistente}`, 'info');
+            // Abrir el selector de archivos
+            const inputSyncCSV = document.getElementById('inputSyncCSV');
+            if (inputSyncCSV) {
+                inputSyncCSV.click();
+            }
+            return;
+        }
+        
         if (!this.archivoSyncSeleccionado) {
             this.mostrarToast('❌ No hay archivo seleccionado para sincronizar', 'danger');
             return;
@@ -407,43 +419,44 @@ class SistemaVentas {
     // Cargar archivo de sincronización persistente desde localStorage
     cargarArchivoSyncPersistente() {
         try {
-            const archivoPersistente = localStorage.getItem('archivoSyncSeleccionado');
-            if (archivoPersistente) {
-                const datosArchivo = JSON.parse(archivoPersistente);
-                console.log('📁 Cargando archivo de sincronización persistente:', datosArchivo.nombre);
+            const rutaArchivo = localStorage.getItem('rutaArchivoSync');
+            if (rutaArchivo) {
+                console.log('📁 Cargando ruta de archivo de sincronización persistente:', rutaArchivo);
                 
-                // Crear un objeto File simulado con los datos guardados
-                const blob = new Blob([datosArchivo.contenido], { type: 'text/csv' });
-                this.archivoSyncSeleccionado = new File([blob], datosArchivo.nombre, { type: 'text/csv' });
+                // Mostrar la ruta en la interfaz
+                this.mostrarRutaArchivoPersistente(rutaArchivo);
                 
-                // Actualizar la interfaz para mostrar el archivo cargado
-                this.actualizarInterfazArchivoSync();
-                
-                console.log('✅ Archivo de sincronización persistente cargado correctamente');
+                console.log('✅ Ruta de archivo de sincronización persistente cargada correctamente');
             }
         } catch (error) {
-            console.error('❌ Error cargando archivo de sincronización persistente:', error);
+            console.error('❌ Error cargando ruta de archivo de sincronización persistente:', error);
         }
     }
 
-    // Guardar archivo de sincronización en localStorage para persistencia
-    guardarArchivoSyncPersistente(archivo) {
+    // Guardar ruta de archivo de sincronización en localStorage para persistencia
+    guardarRutaArchivoSync(archivo) {
         try {
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                const datosArchivo = {
-                    nombre: archivo.name,
-                    contenido: e.target.result,
-                    fechaSeleccion: new Date().toISOString()
-                };
-                
-                localStorage.setItem('archivoSyncSeleccionado', JSON.stringify(datosArchivo));
-                console.log('💾 Archivo de sincronización guardado persistentemente:', archivo.name);
-            };
-            reader.readAsText(archivo);
+            // Guardar solo la ruta del archivo (no el contenido)
+            const rutaArchivo = archivo.name; // En el navegador, solo tenemos el nombre
+            localStorage.setItem('rutaArchivoSync', rutaArchivo);
+            console.log('💾 Ruta de archivo de sincronización guardada persistentemente:', rutaArchivo);
         } catch (error) {
-            console.error('❌ Error guardando archivo de sincronización persistente:', error);
+            console.error('❌ Error guardando ruta de archivo de sincronización persistente:', error);
         }
+    }
+
+    // Mostrar ruta de archivo persistente en la interfaz
+    mostrarRutaArchivoPersistente(rutaArchivo) {
+        const archivoSeleccionado = document.getElementById('archivoSeleccionado');
+        const nombreArchivo = document.getElementById('nombreArchivo');
+        const btnEjecutar = document.getElementById('ejecutarSync');
+        
+        if (nombreArchivo) nombreArchivo.textContent = rutaArchivo;
+        if (archivoSeleccionado) archivoSeleccionado.style.display = 'block';
+        if (btnEjecutar) btnEjecutar.disabled = false;
+        
+        // Marcar que hay un archivo persistente pero no cargado en memoria
+        this.archivoSyncPersistente = rutaArchivo;
     }
 
     // Actualizar interfaz para mostrar archivo de sincronización
@@ -471,7 +484,8 @@ class SistemaVentas {
         if (inputSyncCSV) inputSyncCSV.value = '';
         
         // Limpiar también la persistencia
-        localStorage.removeItem('archivoSyncSeleccionado');
+        localStorage.removeItem('rutaArchivoSync');
+        this.archivoSyncPersistente = null;
         
         // Mostrar confirmación
         this.mostrarToast('🧹 Archivo de sincronización deseleccionado', 'info');

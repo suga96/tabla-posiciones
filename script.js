@@ -291,9 +291,9 @@ class SistemaVentas {
                     this.actualizarInterfaz();
                     
                     // Mostrar resumen de la importación
-                    let mensajeResumen = `📥 CSV sincronizado: ${vendedoresCreados} vendedores, ${ventasCreadas} ventas nuevas`;
+                    let mensajeResumen = `📥 CSV sincronizado: ${vendedoresCreados} vendedores, ${ventasCreadas} ventas`;
                     if (ventasDuplicadas > 0) {
-                        mensajeResumen += `, ${ventasDuplicadas} duplicados omitidos automáticamente`;
+                        mensajeResumen += `, ${ventasDuplicadas} duplicados`;
                     }
                     this.mostrarToast(mensajeResumen, 'success');
                 } catch (err) {

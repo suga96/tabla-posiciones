@@ -10,7 +10,6 @@ class SistemaVentas {
         this.rankingAnterior = {}; // Para trackear tendencias
         this.puntajesInicioDia = {}; // Para comparar con inicio del día
         this.archivoSyncSeleccionado = null; // Archivo seleccionado para sincronización
-        this.archivoSyncPersistente = null; // Ruta del archivo persistente
         this.inicializarAudio();
         this.inicializarEventos();
         this.inicializarRotacion();

@@ -15,6 +15,7 @@ class SistemaVentas {
         this.inicializarRotacion();
         this.inicializarPuntajesInicioDia();
         this.verificarNuevoDia();
+        this.cargarArchivoSyncPersistente(); // Cargar archivo de sincronización persistente
         this.actualizarInterfaz();
         console.log('SistemaVentas inicializado correctamente');
     }
@@ -145,6 +146,10 @@ class SistemaVentas {
                     if (nombreArchivo) nombreArchivo.textContent = file.name;
                     if (archivoSeleccionado) archivoSeleccionado.style.display = 'block';
                     if (btnEjecutarSync) btnEjecutarSync.disabled = false;
+                    
+                    // Guardar archivo persistentemente
+                    this.guardarArchivoSyncPersistente(file);
+                    
                     this.mostrarToast(`📁 Archivo seleccionado: ${file.name}`, 'success');
                 }
             });
@@ -181,6 +186,11 @@ class SistemaVentas {
         // Botón cerrar herramientas
         document.getElementById('closeTools').addEventListener('click', () => {
             this.cerrarHerramientas();
+        });
+
+        // Botón limpiar archivo de sincronización
+        document.getElementById('limpiarArchivoSync').addEventListener('click', () => {
+            this.limpiarSeleccionSync();
         });
 
         // Inicializar contexto de audio en primera interacción
@@ -394,6 +404,61 @@ class SistemaVentas {
         }, 3000);
     }
 
+    // Cargar archivo de sincronización persistente desde localStorage
+    cargarArchivoSyncPersistente() {
+        try {
+            const archivoPersistente = localStorage.getItem('archivoSyncSeleccionado');
+            if (archivoPersistente) {
+                const datosArchivo = JSON.parse(archivoPersistente);
+                console.log('📁 Cargando archivo de sincronización persistente:', datosArchivo.nombre);
+                
+                // Crear un objeto File simulado con los datos guardados
+                const blob = new Blob([datosArchivo.contenido], { type: 'text/csv' });
+                this.archivoSyncSeleccionado = new File([blob], datosArchivo.nombre, { type: 'text/csv' });
+                
+                // Actualizar la interfaz para mostrar el archivo cargado
+                this.actualizarInterfazArchivoSync();
+                
+                console.log('✅ Archivo de sincronización persistente cargado correctamente');
+            }
+        } catch (error) {
+            console.error('❌ Error cargando archivo de sincronización persistente:', error);
+        }
+    }
+
+    // Guardar archivo de sincronización en localStorage para persistencia
+    guardarArchivoSyncPersistente(archivo) {
+        try {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const datosArchivo = {
+                    nombre: archivo.name,
+                    contenido: e.target.result,
+                    fechaSeleccion: new Date().toISOString()
+                };
+                
+                localStorage.setItem('archivoSyncSeleccionado', JSON.stringify(datosArchivo));
+                console.log('💾 Archivo de sincronización guardado persistentemente:', archivo.name);
+            };
+            reader.readAsText(archivo);
+        } catch (error) {
+            console.error('❌ Error guardando archivo de sincronización persistente:', error);
+        }
+    }
+
+    // Actualizar interfaz para mostrar archivo de sincronización
+    actualizarInterfazArchivoSync() {
+        const archivoSeleccionado = document.getElementById('archivoSeleccionado');
+        const nombreArchivo = document.getElementById('nombreArchivo');
+        const btnEjecutar = document.getElementById('ejecutarSync');
+        
+        if (this.archivoSyncSeleccionado) {
+            if (nombreArchivo) nombreArchivo.textContent = this.archivoSyncSeleccionado.name;
+            if (archivoSeleccionado) archivoSeleccionado.style.display = 'block';
+            if (btnEjecutar) btnEjecutar.disabled = false;
+        }
+    }
+
     // Limpiar selección de archivo de sincronización
     limpiarSeleccionSync() {
         this.archivoSyncSeleccionado = null;
@@ -404,6 +469,12 @@ class SistemaVentas {
         if (archivoSeleccionado) archivoSeleccionado.style.display = 'none';
         if (btnEjecutar) btnEjecutar.disabled = true;
         if (inputSyncCSV) inputSyncCSV.value = '';
+        
+        // Limpiar también la persistencia
+        localStorage.removeItem('archivoSyncSeleccionado');
+        
+        // Mostrar confirmación
+        this.mostrarToast('🧹 Archivo de sincronización deseleccionado', 'info');
         
         console.log('🧹 Selección de archivo de sincronización limpiada');
     }

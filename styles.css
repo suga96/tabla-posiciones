@@ -1368,8 +1368,46 @@ tbody tr .last-sale {
     gap: 0.5rem;
 }
 
+.archivo-info {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0.5rem;
+    background: rgba(16, 185, 129, 0.1);
+    border: 1px solid rgba(16, 185, 129, 0.2);
+    border-radius: 6px;
+    margin-top: 0.5rem;
+}
+
 .archivo-info i {
     color: var(--success-green);
+}
+
+.btn-clear-sync {
+    background: rgba(239, 68, 68, 0.1);
+    color: #ef4444;
+    border: 1px solid rgba(239, 68, 68, 0.2);
+    border-radius: 4px;
+    padding: 0.3rem 0.5rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 0.7rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 24px;
+    height: 24px;
+}
+
+.btn-clear-sync:hover {
+    background: rgba(239, 68, 68, 0.2);
+    border-color: rgba(239, 68, 68, 0.4);
+    transform: scale(1.05);
+}
+
+.btn-clear-sync:active {
+    transform: scale(0.95);
 }
 
 /* Responsive para sincronización */
@@ -1377,5 +1415,15 @@ tbody tr .last-sale {
     .btn-sync, .btn-sync-execute {
         padding: 0.8rem 1rem;
         font-size: 0.85rem;
+    }
+    
+    .archivo-info {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.3rem;
+    }
+    
+    .btn-clear-sync {
+        align-self: flex-end;
     }
 }

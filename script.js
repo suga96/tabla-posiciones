@@ -188,7 +188,8 @@ class SistemaVentas {
         setTimeout(() => form.classList.remove('animate-pulse'), 600);
     }
 
-    // === Importar datos desde CSV ===
+    // === Importar datos desde CSV (con detección automática de duplicados) ===
+    // Optimizado para sincronización automática - omite duplicados sin intervención manual
     importarDesdeCSV(file) {
         try {
             const reader = new FileReader();
@@ -196,7 +197,7 @@ class SistemaVentas {
             const originalHTML = btn ? btn.innerHTML : '';
             if (btn) btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Importando...';
 
-            reader.onload = async (e) => {
+            reader.onload = (e) => {
                 try {
                     const texto = e.target.result;
                     const { headers, rows } = this.parsearCSV(texto);
@@ -224,9 +225,7 @@ class SistemaVentas {
 
                     const nombreAId = new Map(this.vendedores.map(v => [v.nombre.toLowerCase(), v.id]));
 
-                    // Procesar filas una por una para manejar duplicados
-                    for (let idx = 0; idx < rows.length; idx++) {
-                        const row = rows[idx];
+                    rows.forEach((row, idx) => {
                         const nombre = (colNombre ? row[colNombre] : '').trim();
                         if (!nombre) return; // saltar filas sin nombre
 
@@ -274,20 +273,9 @@ class SistemaVentas {
                             
                             if (esDuplicada) {
                                 ventasDuplicadas++;
-                                console.log(`⚠️ Venta duplicada detectada para ${vendedor.nombre}: ${monto} el ${fechaVenta.toLocaleDateString()}`);
-                                
-                                // Preguntar al usuario qué hacer con los duplicados
-                                const accion = await this.manejarVentaDuplicada(vendedor.nombre, monto, fechaVenta);
-                                
-                                if (accion === 'omitir') {
-                                    ventasOmitidas++;
-                                    return; // Saltar esta venta
-                                } else if (accion === 'cancelar') {
-                                    // Cancelar toda la importación
-                                    if (btn) btn.innerHTML = originalHTML;
-                                    return;
-                                }
-                                // Si accion === 'agregar', continuar con la lógica normal
+                                ventasOmitidas++;
+                                console.log(`⚠️ Venta duplicada omitida automáticamente: ${vendedor.nombre} - ${this.formatearMoneda(monto)} el ${fechaVenta.toLocaleDateString()}`);
+                                return; // Saltar esta venta automáticamente
                             }
 
                             vendedor.ventas.push({
@@ -297,18 +285,15 @@ class SistemaVentas {
                             });
                             ventasCreadas++;
                         }
-                    }
+                    });
 
                     this.guardarDatos();
                     this.actualizarInterfaz();
                     
                     // Mostrar resumen de la importación
-                    let mensajeResumen = `📥 CSV importado: ${vendedoresCreados} vendedores, ${ventasCreadas} ventas`;
+                    let mensajeResumen = `📥 CSV sincronizado: ${vendedoresCreados} vendedores, ${ventasCreadas} ventas nuevas`;
                     if (ventasDuplicadas > 0) {
-                        mensajeResumen += `, ${ventasDuplicadas} duplicados detectados`;
-                        if (ventasOmitidas > 0) {
-                            mensajeResumen += ` (${ventasOmitidas} omitidos)`;
-                        }
+                        mensajeResumen += `, ${ventasDuplicadas} duplicados omitidos automáticamente`;
                     }
                     this.mostrarToast(mensajeResumen, 'success');
                 } catch (err) {
@@ -352,108 +337,6 @@ class SistemaVentas {
         return ventasExistentes.length > 0;
     }
 
-    // Manejar venta duplicada - preguntar al usuario qué hacer
-    manejarVentaDuplicada(nombreVendedor, monto, fechaVenta) {
-        const fechaFormateada = fechaVenta.toLocaleDateString('es-CL');
-        const montoFormateado = this.formatearMoneda(monto);
-        
-        const mensaje = `⚠️ VENTA DUPLICADA DETECTADA\n\n` +
-                       `Vendedor: ${nombreVendedor}\n` +
-                       `Monto: ${montoFormateado}\n` +
-                       `Fecha: ${fechaFormateada}\n\n` +
-                       `¿Qué desea hacer?`;
-        
-        const opciones = [
-            'Omitir esta venta',
-            'Agregar de todas formas',
-            'Cancelar importación'
-        ];
-        
-        // Crear diálogo personalizado
-        const resultado = this.mostrarDialogoOpciones(mensaje, opciones);
-        
-        switch (resultado) {
-            case 0: return 'omitir';
-            case 1: return 'agregar';
-            case 2: return 'cancelar';
-            default: return 'omitir'; // Por defecto omitir
-        }
-    }
-
-    // Mostrar diálogo con opciones personalizadas
-    mostrarDialogoOpciones(mensaje, opciones) {
-        // Crear overlay
-        const overlay = document.createElement('div');
-        overlay.style.cssText = `
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.5);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            z-index: 10000;
-        `;
-        
-        // Crear modal
-        const modal = document.createElement('div');
-        modal.style.cssText = `
-            background: white;
-            border-radius: 12px;
-            padding: 24px;
-            max-width: 500px;
-            width: 90%;
-            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
-        `;
-        
-        modal.innerHTML = `
-            <div style="text-align: center; margin-bottom: 20px;">
-                <h3 style="margin: 0 0 16px 0; color: #1f2937; font-size: 18px;">${mensaje}</h3>
-            </div>
-            <div style="display: flex; flex-direction: column; gap: 12px;">
-                ${opciones.map((opcion, index) => `
-                    <button class="opcion-btn" data-index="${index}" style="
-                        padding: 12px 16px;
-                        border: 2px solid #e5e7eb;
-                        border-radius: 8px;
-                        background: white;
-                        cursor: pointer;
-                        font-size: 14px;
-                        transition: all 0.2s;
-                        text-align: left;
-                    ">${opcion}</button>
-                `).join('')}
-            </div>
-        `;
-        
-        overlay.appendChild(modal);
-        document.body.appendChild(overlay);
-        
-        // Retornar promesa que se resuelve cuando el usuario selecciona
-        return new Promise((resolve) => {
-            const botones = modal.querySelectorAll('.opcion-btn');
-            
-            botones.forEach((boton, index) => {
-                boton.addEventListener('click', () => {
-                    document.body.removeChild(overlay);
-                    resolve(index);
-                });
-                
-                // Efectos hover
-                boton.addEventListener('mouseenter', () => {
-                    boton.style.borderColor = '#3b82f6';
-                    boton.style.backgroundColor = '#f8fafc';
-                });
-                
-                boton.addEventListener('mouseleave', () => {
-                    boton.style.borderColor = '#e5e7eb';
-                    boton.style.backgroundColor = 'white';
-                });
-            });
-        });
-    }
 
     // Parser CSV simple con soporte de comillas
     parsearCSV(texto) {

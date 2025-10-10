@@ -225,7 +225,25 @@
                             <i class="fas fa-download"></i> CSV
                         </button>
                     </div>
+                    
+                    <!-- Sección de Sincronización Automática -->
+                    <div class="sync-section">
+                        <h4><i class="fas fa-sync-alt"></i> Sincronización</h4>
+                        <div class="sync-buttons">
+                            <button type="button" id="seleccionarArchivoSync" class="btn-sync">
+                                <i class="fas fa-file-csv"></i> Seleccionar Archivo
+                            </button>
+                            <button type="button" id="ejecutarSync" class="btn-sync-execute" disabled>
+                                <i class="fas fa-play"></i> Ejecutar Sync
+                            </button>
+                        </div>
+                        <div id="archivoSeleccionado" class="archivo-info" style="display: none;">
+                            <i class="fas fa-file"></i> <span id="nombreArchivo"></span>
+                        </div>
+                    </div>
+                    
                     <input type="file" id="inputCSV" accept=".csv" style="display:none" />
+                    <input type="file" id="inputSyncCSV" accept=".csv" style="display:none" />
                 </div>
             </div>
         </div>

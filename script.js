@@ -9,6 +9,7 @@ class SistemaVentas {
         this.contadorRotacion = 60;
         this.rankingAnterior = {}; // Para trackear tendencias
         this.puntajesInicioDia = {}; // Para comparar con inicio del día
+        this.archivoSyncSeleccionado = null; // Archivo seleccionado para sincronización
         this.inicializarAudio();
         this.inicializarEventos();
         this.inicializarRotacion();
@@ -113,6 +114,35 @@ class SistemaVentas {
                 }
                 // Permitir volver a seleccionar el mismo archivo después
                 e.target.value = '';
+            });
+        }
+
+        // Botones de sincronización automática
+        const btnSeleccionarSync = document.getElementById('seleccionarArchivoSync');
+        const btnEjecutarSync = document.getElementById('ejecutarSync');
+        const inputSyncCSV = document.getElementById('inputSyncCSV');
+        const archivoSeleccionado = document.getElementById('archivoSeleccionado');
+        const nombreArchivo = document.getElementById('nombreArchivo');
+        
+        if (btnSeleccionarSync && inputSyncCSV) {
+            btnSeleccionarSync.addEventListener('click', () => inputSyncCSV.click());
+            inputSyncCSV.addEventListener('change', (e) => {
+                const file = e.target.files && e.target.files[0];
+                if (file) {
+                    this.archivoSyncSeleccionado = file;
+                    nombreArchivo.textContent = file.name;
+                    archivoSeleccionado.style.display = 'block';
+                    btnEjecutarSync.disabled = false;
+                    this.mostrarToast(`📁 Archivo seleccionado: ${file.name}`, 'success');
+                }
+            });
+        }
+
+        if (btnEjecutarSync) {
+            btnEjecutarSync.addEventListener('click', () => {
+                if (this.archivoSyncSeleccionado) {
+                    this.ejecutarSincronizacion();
+                }
             });
         }
 
@@ -314,6 +344,46 @@ class SistemaVentas {
             console.error('Error preparando importación CSV:', error);
             alert('Error preparando la importación CSV');
         }
+    }
+
+    // Ejecutar sincronización con archivo previamente seleccionado
+    ejecutarSincronizacion() {
+        if (!this.archivoSyncSeleccionado) {
+            this.mostrarToast('❌ No hay archivo seleccionado para sincronizar', 'danger');
+            return;
+        }
+
+        console.log('🔄 Ejecutando sincronización automática...');
+        this.mostrarToast('🔄 Sincronizando datos...', 'info');
+        
+        // Ejecutar la importación con el archivo seleccionado
+        this.importarDesdeCSV(this.archivoSyncSeleccionado);
+        
+        // Feedback visual del botón
+        const btnEjecutar = document.getElementById('ejecutarSync');
+        const originalHTML = btnEjecutar.innerHTML;
+        btnEjecutar.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sincronizando...';
+        btnEjecutar.disabled = true;
+        
+        // Restaurar botón después de un tiempo
+        setTimeout(() => {
+            btnEjecutar.innerHTML = originalHTML;
+            btnEjecutar.disabled = false;
+        }, 3000);
+    }
+
+    // Limpiar selección de archivo de sincronización
+    limpiarSeleccionSync() {
+        this.archivoSyncSeleccionado = null;
+        const archivoSeleccionado = document.getElementById('archivoSeleccionado');
+        const btnEjecutar = document.getElementById('ejecutarSync');
+        const inputSyncCSV = document.getElementById('inputSyncCSV');
+        
+        if (archivoSeleccionado) archivoSeleccionado.style.display = 'none';
+        if (btnEjecutar) btnEjecutar.disabled = true;
+        if (inputSyncCSV) inputSyncCSV.value = '';
+        
+        console.log('🧹 Selección de archivo de sincronización limpiada');
     }
 
     // Verificar si una venta es duplicada
@@ -1464,6 +1534,26 @@ window.importarDatos = function(event) {
         }
     };
     reader.readAsText(file);
+};
+
+// Función global para sincronización automática desde scripts externos
+window.sincronizarCSV = function(rutaArchivo) {
+    if (!window.sistemaVentas) {
+        console.error('❌ Sistema de ventas no inicializado');
+        return false;
+    }
+    
+    // Crear un objeto File simulado para la sincronización
+    fetch(rutaArchivo)
+        .then(response => response.blob())
+        .then(blob => {
+            const file = new File([blob], 'sync.csv', { type: 'text/csv' });
+            window.sistemaVentas.importarDesdeCSV(file);
+            console.log('✅ Sincronización automática ejecutada');
+        })
+        .catch(error => {
+            console.error('❌ Error en sincronización automática:', error);
+        });
 };
 
 // (Eliminado) Lógica de instalación PWA y botón de "Instalar App"

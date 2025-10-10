@@ -124,26 +124,48 @@ class SistemaVentas {
         const archivoSeleccionado = document.getElementById('archivoSeleccionado');
         const nombreArchivo = document.getElementById('nombreArchivo');
         
+        console.log('🔧 Inicializando botones de sincronización...');
+        console.log('btnSeleccionarSync:', btnSeleccionarSync);
+        console.log('btnEjecutarSync:', btnEjecutarSync);
+        console.log('inputSyncCSV:', inputSyncCSV);
+        
         if (btnSeleccionarSync && inputSyncCSV) {
-            btnSeleccionarSync.addEventListener('click', () => inputSyncCSV.click());
+            console.log('✅ Configurando botón seleccionar archivo');
+            btnSeleccionarSync.addEventListener('click', () => {
+                console.log('🖱️ Botón seleccionar archivo clickeado');
+                inputSyncCSV.click();
+            });
+            
             inputSyncCSV.addEventListener('change', (e) => {
+                console.log('📁 Archivo seleccionado en input');
                 const file = e.target.files && e.target.files[0];
                 if (file) {
+                    console.log('📄 Archivo válido:', file.name);
                     this.archivoSyncSeleccionado = file;
-                    nombreArchivo.textContent = file.name;
-                    archivoSeleccionado.style.display = 'block';
-                    btnEjecutarSync.disabled = false;
+                    if (nombreArchivo) nombreArchivo.textContent = file.name;
+                    if (archivoSeleccionado) archivoSeleccionado.style.display = 'block';
+                    if (btnEjecutarSync) btnEjecutarSync.disabled = false;
                     this.mostrarToast(`📁 Archivo seleccionado: ${file.name}`, 'success');
                 }
             });
+        } else {
+            console.error('❌ No se encontraron elementos para sincronización');
         }
 
         if (btnEjecutarSync) {
+            console.log('✅ Configurando botón ejecutar sincronización');
             btnEjecutarSync.addEventListener('click', () => {
+                console.log('🖱️ Botón ejecutar sync clickeado');
                 if (this.archivoSyncSeleccionado) {
+                    console.log('🔄 Ejecutando sincronización con archivo:', this.archivoSyncSeleccionado.name);
                     this.ejecutarSincronizacion();
+                } else {
+                    console.log('❌ No hay archivo seleccionado');
+                    this.mostrarToast('❌ No hay archivo seleccionado para sincronizar', 'danger');
                 }
             });
+        } else {
+            console.error('❌ No se encontró botón ejecutar sincronización');
         }
 
         // Botón de recalcular inicio del día

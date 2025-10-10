@@ -1270,25 +1270,26 @@ tbody tr .last-sale {
 
 /* Sección de Sincronización */
 .sync-section {
-    margin-top: 1rem;
-    padding: 1rem;
+    margin-top: 0.8rem;
+    padding: 0.8rem;
     background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
-    border-radius: 8px;
+    border-radius: 6px;
     border: 1px solid var(--border-color);
 }
 
 .sync-section h4 {
     color: var(--primary-blue);
-    font-size: 0.9rem;
+    font-size: 0.85rem;
     font-weight: 600;
-    margin-bottom: 0.8rem;
+    margin-bottom: 0.6rem;
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: 0.4rem;
 }
 
 .sync-buttons {
-    display: flex;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
     gap: 0.5rem;
     margin-bottom: 0.8rem;
 }
@@ -1300,7 +1301,7 @@ tbody tr .last-sale {
     border-radius: 6px;
     font-weight: 600;
     font-size: 0.8rem;
-    padding: 0.6rem 0.8rem;
+    padding: 0.6rem;
     cursor: pointer;
     transition: all 0.2s ease;
     flex: 1;
@@ -1308,6 +1309,7 @@ tbody tr .last-sale {
     align-items: center;
     justify-content: center;
     gap: 0.4rem;
+    width: 100%;
 }
 
 .btn-sync:hover {
@@ -1327,7 +1329,7 @@ tbody tr .last-sale {
     border-radius: 6px;
     font-weight: 600;
     font-size: 0.8rem;
-    padding: 0.6rem 0.8rem;
+    padding: 0.6rem;
     cursor: pointer;
     transition: all 0.2s ease;
     flex: 1;
@@ -1335,6 +1337,7 @@ tbody tr .last-sale {
     align-items: center;
     justify-content: center;
     gap: 0.4rem;
+    width: 100%;
 }
 
 .btn-sync-execute:hover:not(:disabled) {
@@ -1372,10 +1375,12 @@ tbody tr .last-sale {
 /* Responsive para sincronización */
 @media (max-width: 768px) {
     .sync-buttons {
-        flex-direction: column;
+        grid-template-columns: 1fr;
+        gap: 0.4rem;
     }
     
     .btn-sync, .btn-sync-execute {
         width: 100%;
+        padding: 0.7rem;
     }
 }

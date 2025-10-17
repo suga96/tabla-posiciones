@@ -455,6 +455,61 @@ class SistemaVentas {
                 }
             }
         } 
+        // Verificar si el archivo necesita re-selección (File System Access API persistente)
+        else if (this.archivoSyncSeleccionado && this.archivoSyncSeleccionado.needsReselection) {
+            console.log('🔄 Archivo persistente necesita re-selección para File System Access API...');
+            this.mostrarToast('🔄 Re-seleccionando archivo para sincronización...', 'info');
+            
+            try {
+                // Intentar re-seleccionar el archivo automáticamente
+                if ('showOpenFilePicker' in window) {
+                    const [fileHandle] = await window.showOpenFilePicker({
+                        types: [{
+                            description: 'Archivos CSV',
+                            accept: {
+                                'text/csv': ['.csv'],
+                                'text/plain': ['.csv']
+                            }
+                        }],
+                        excludeAcceptAllOption: true
+                    });
+                    
+                    // Actualizar el handle
+                    this.archivoSyncHandle = fileHandle;
+                    
+                    // Leer el archivo y sincronizar
+                    const file = await fileHandle.getFile();
+                    console.log('📄 Archivo re-seleccionado y leído:', file.name);
+                    
+                    // Ejecutar la importación
+                    this.importarDesdeCSV(file);
+                    
+                    // Actualizar persistencia
+                    await this.guardarArchivoSyncPersistente(fileHandle);
+                    
+                    // Feedback visual del botón
+                    const btnEjecutar = document.getElementById('ejecutarSync');
+                    const originalHTML = btnEjecutar.innerHTML;
+                    btnEjecutar.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sincronizando...';
+                    btnEjecutar.disabled = true;
+                    
+                    // Restaurar botón después de un tiempo
+                    setTimeout(() => {
+                        btnEjecutar.innerHTML = originalHTML;
+                        btnEjecutar.disabled = false;
+                    }, 3000);
+                    
+                } else {
+                    throw new Error('File System Access API no disponible');
+                }
+                
+            } catch (error) {
+                if (error.name !== 'AbortError') {
+                    console.error('❌ Error re-seleccionando archivo:', error);
+                    this.mostrarToast('❌ Error re-seleccionando archivo. Use el botón "Seleccionar Archivo" manualmente.', 'danger');
+                }
+            }
+        }
         // Fallback: usar archivo tradicional
         else if (this.archivoSyncSeleccionado) {
             console.log('🔄 Ejecutando sincronización con archivo tradicional...');
@@ -489,13 +544,23 @@ class SistemaVentas {
                 
                 // Verificar el tipo de persistencia
                 if (datosArchivo.tipo === 'fileHandle') {
-                    // Para File System Access API, solo mostrar el nombre
-                    // El handle real se debe volver a seleccionar por el usuario
+                    // Para File System Access API, mostrar el nombre pero indicar que necesita re-selección
                     console.log('📁 Archivo persistente es un handle de File System Access API');
-                    console.log('⚠️ El usuario debe volver a seleccionar el archivo para usar File System Access API');
+                    
+                    // Crear un objeto simulado para mantener la interfaz
+                    this.archivoSyncSeleccionado = {
+                        name: datosArchivo.nombre,
+                        isPersistent: true,
+                        needsReselection: true
+                    };
+                    
+                    // Actualizar la interfaz para mostrar el archivo cargado
+                    this.actualizarInterfazArchivoSync();
                     
                     // Mostrar mensaje informativo
-                    this.mostrarToast('📁 Archivo persistente detectado. Por favor, vuelva a seleccionar el archivo para usar File System Access API.', 'info');
+                    this.mostrarToast(`📁 Archivo persistente: ${datosArchivo.nombre}. Presione "Sincronizar" para usar.`, 'info');
+                    
+                    console.log('✅ Archivo persistente restaurado (requiere re-selección para File System Access API)');
                 } else if (datosArchivo.tipo === 'file' && datosArchivo.contenido) {
                     // Crear un objeto File simulado con los datos guardados (fallback)
                     const blob = new Blob([datosArchivo.contenido], { type: 'text/csv' });
@@ -559,7 +624,18 @@ class SistemaVentas {
         // Verificar si tenemos un archivo seleccionado (tradicional o handle)
         if (this.archivoSyncSeleccionado || this.archivoSyncHandle) {
             const nombre = this.archivoSyncSeleccionado ? this.archivoSyncSeleccionado.name : this.archivoSyncHandle.name;
-            if (nombreArchivo) nombreArchivo.textContent = nombre;
+            
+            // Verificar si necesita re-selección
+            const necesitaReseleccion = this.archivoSyncSeleccionado && this.archivoSyncSeleccionado.needsReselection;
+            
+            if (nombreArchivo) {
+                nombreArchivo.textContent = nombre;
+                // Agregar indicador visual si necesita re-selección
+                if (necesitaReseleccion) {
+                    nombreArchivo.innerHTML = `${nombre} <span style="color: #ff9800; font-size: 0.8em;">(Re-seleccionar al sincronizar)</span>`;
+                }
+            }
+            
             if (archivoSeleccionado) archivoSeleccionado.style.display = 'block';
             if (btnEjecutar) btnEjecutar.disabled = false;
         }

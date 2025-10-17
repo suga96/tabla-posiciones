@@ -10,6 +10,7 @@ class SistemaVentas {
         this.rankingAnterior = {}; // Para trackear tendencias
         this.puntajesInicioDia = {}; // Para comparar con inicio del día
         this.archivoSyncSeleccionado = null; // Archivo seleccionado para sincronización
+        this.archivoSyncHandle = null; // Handle del archivo para File System Access API
         this.inicializarAudio();
         this.inicializarEventos();
         this.inicializarRotacion();
@@ -132,13 +133,50 @@ class SistemaVentas {
         
         if (btnSeleccionarSync && inputSyncCSV) {
             console.log('✅ Configurando botón seleccionar archivo');
-            btnSeleccionarSync.addEventListener('click', () => {
+            btnSeleccionarSync.addEventListener('click', async () => {
                 console.log('🖱️ Botón seleccionar archivo clickeado');
-                inputSyncCSV.click();
+                
+                // Intentar usar File System Access API primero
+                if ('showOpenFilePicker' in window) {
+                    try {
+                        const [fileHandle] = await window.showOpenFilePicker({
+                            types: [{
+                                description: 'Archivos CSV',
+                                accept: {
+                                    'text/csv': ['.csv'],
+                                    'text/plain': ['.csv']
+                                }
+                            }],
+                            excludeAcceptAllOption: true
+                        });
+                        
+                        console.log('📁 Archivo seleccionado con File System Access API:', fileHandle.name);
+                        this.archivoSyncHandle = fileHandle;
+                        
+                        if (nombreArchivo) nombreArchivo.textContent = fileHandle.name;
+                        if (archivoSeleccionado) archivoSeleccionado.style.display = 'block';
+                        if (btnEjecutarSync) btnEjecutarSync.disabled = false;
+                        
+                        // Guardar handle persistentemente
+                        this.guardarArchivoSyncPersistente(fileHandle);
+                        
+                        this.mostrarToast(`📁 Archivo seleccionado: ${fileHandle.name}`, 'success');
+                        
+                    } catch (error) {
+                        if (error.name !== 'AbortError') {
+                            console.error('❌ Error seleccionando archivo con File System Access API:', error);
+                            this.mostrarToast('❌ Error seleccionando archivo', 'danger');
+                        }
+                    }
+                } else {
+                    // Fallback: usar input tradicional
+                    console.log('📁 File System Access API no disponible, usando input tradicional');
+                    inputSyncCSV.click();
+                }
             });
             
             inputSyncCSV.addEventListener('change', (e) => {
-                console.log('📁 Archivo seleccionado en input');
+                console.log('📁 Archivo seleccionado en input tradicional');
                 const file = e.target.files && e.target.files[0];
                 if (file) {
                     console.log('📄 Archivo válido:', file.name);
@@ -147,7 +185,7 @@ class SistemaVentas {
                     if (archivoSeleccionado) archivoSeleccionado.style.display = 'block';
                     if (btnEjecutarSync) btnEjecutarSync.disabled = false;
                     
-                    // Guardar archivo persistentemente
+                    // Guardar archivo persistentemente (fallback)
                     this.guardarArchivoSyncPersistente(file);
                     
                     this.mostrarToast(`📁 Archivo seleccionado: ${file.name}`, 'success');
@@ -159,11 +197,12 @@ class SistemaVentas {
 
         if (btnEjecutarSync) {
             console.log('✅ Configurando botón ejecutar sincronización');
-            btnEjecutarSync.addEventListener('click', () => {
+            btnEjecutarSync.addEventListener('click', async () => {
                 console.log('🖱️ Botón ejecutar sync clickeado');
-                if (this.archivoSyncSeleccionado) {
-                    console.log('🔄 Ejecutando sincronización con archivo:', this.archivoSyncSeleccionado.name);
-                    this.ejecutarSincronizacion();
+                if (this.archivoSyncSeleccionado || this.archivoSyncHandle) {
+                    const nombreArchivo = this.archivoSyncSeleccionado ? this.archivoSyncSeleccionado.name : this.archivoSyncHandle.name;
+                    console.log('🔄 Ejecutando sincronización con archivo:', nombreArchivo);
+                    await this.ejecutarSincronizacion();
                 } else {
                     console.log('❌ No hay archivo seleccionado');
                     this.mostrarToast('❌ No hay archivo seleccionado para sincronizar', 'danger');
@@ -379,29 +418,65 @@ class SistemaVentas {
     }
 
     // Ejecutar sincronización con archivo previamente seleccionado
-    ejecutarSincronizacion() {
-        if (!this.archivoSyncSeleccionado) {
+    async ejecutarSincronizacion() {
+        // Verificar si tenemos handle de File System Access API
+        if (this.archivoSyncHandle) {
+            console.log('🔄 Ejecutando sincronización con File System Access API...');
+            this.mostrarToast('🔄 Sincronizando datos desde archivo original...', 'info');
+            
+            try {
+                // Leer archivo directamente desde su ubicación original
+                const file = await this.archivoSyncHandle.getFile();
+                console.log('📄 Archivo leído directamente desde ubicación original:', file.name);
+                
+                // Ejecutar la importación con el archivo actualizado
+                this.importarDesdeCSV(file);
+                
+                // Feedback visual del botón
+                const btnEjecutar = document.getElementById('ejecutarSync');
+                const originalHTML = btnEjecutar.innerHTML;
+                btnEjecutar.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sincronizando...';
+                btnEjecutar.disabled = true;
+                
+                // Restaurar botón después de un tiempo
+                setTimeout(() => {
+                    btnEjecutar.innerHTML = originalHTML;
+                    btnEjecutar.disabled = false;
+                }, 3000);
+                
+            } catch (error) {
+                console.error('❌ Error leyendo archivo con File System Access API:', error);
+                this.mostrarToast('❌ Error accediendo al archivo original', 'danger');
+                
+                // Intentar fallback con archivo en caché si existe
+                if (this.archivoSyncSeleccionado) {
+                    console.log('🔄 Intentando fallback con archivo en caché...');
+                    this.importarDesdeCSV(this.archivoSyncSeleccionado);
+                }
+            }
+        } 
+        // Fallback: usar archivo tradicional
+        else if (this.archivoSyncSeleccionado) {
+            console.log('🔄 Ejecutando sincronización con archivo tradicional...');
+            this.mostrarToast('🔄 Sincronizando datos...', 'info');
+            
+            // Ejecutar la importación con el archivo seleccionado
+            this.importarDesdeCSV(this.archivoSyncSeleccionado);
+            
+            // Feedback visual del botón
+            const btnEjecutar = document.getElementById('ejecutarSync');
+            const originalHTML = btnEjecutar.innerHTML;
+            btnEjecutar.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sincronizando...';
+            btnEjecutar.disabled = true;
+            
+            // Restaurar botón después de un tiempo
+            setTimeout(() => {
+                btnEjecutar.innerHTML = originalHTML;
+                btnEjecutar.disabled = false;
+            }, 3000);
+        } else {
             this.mostrarToast('❌ No hay archivo seleccionado para sincronizar', 'danger');
-            return;
         }
-
-        console.log('🔄 Ejecutando sincronización automática...');
-        this.mostrarToast('🔄 Sincronizando datos...', 'info');
-        
-        // Ejecutar la importación con el archivo seleccionado
-        this.importarDesdeCSV(this.archivoSyncSeleccionado);
-        
-        // Feedback visual del botón
-        const btnEjecutar = document.getElementById('ejecutarSync');
-        const originalHTML = btnEjecutar.innerHTML;
-        btnEjecutar.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sincronizando...';
-        btnEjecutar.disabled = true;
-        
-        // Restaurar botón después de un tiempo
-        setTimeout(() => {
-            btnEjecutar.innerHTML = originalHTML;
-            btnEjecutar.disabled = false;
-        }, 3000);
     }
 
     // Cargar archivo de sincronización persistente desde localStorage
@@ -412,14 +487,27 @@ class SistemaVentas {
                 const datosArchivo = JSON.parse(archivoPersistente);
                 console.log('📁 Cargando archivo de sincronización persistente:', datosArchivo.nombre);
                 
-                // Crear un objeto File simulado con los datos guardados
-                const blob = new Blob([datosArchivo.contenido], { type: 'text/csv' });
-                this.archivoSyncSeleccionado = new File([blob], datosArchivo.nombre, { type: 'text/csv' });
-                
-                // Actualizar la interfaz para mostrar el archivo cargado
-                this.actualizarInterfazArchivoSync();
-                
-                console.log('✅ Archivo de sincronización persistente cargado correctamente');
+                // Verificar el tipo de persistencia
+                if (datosArchivo.tipo === 'fileHandle') {
+                    // Para File System Access API, solo mostrar el nombre
+                    // El handle real se debe volver a seleccionar por el usuario
+                    console.log('📁 Archivo persistente es un handle de File System Access API');
+                    console.log('⚠️ El usuario debe volver a seleccionar el archivo para usar File System Access API');
+                    
+                    // Mostrar mensaje informativo
+                    this.mostrarToast('📁 Archivo persistente detectado. Por favor, vuelva a seleccionar el archivo para usar File System Access API.', 'info');
+                } else if (datosArchivo.tipo === 'file' && datosArchivo.contenido) {
+                    // Crear un objeto File simulado con los datos guardados (fallback)
+                    const blob = new Blob([datosArchivo.contenido], { type: 'text/csv' });
+                    this.archivoSyncSeleccionado = new File([blob], datosArchivo.nombre, { type: 'text/csv' });
+                    
+                    // Actualizar la interfaz para mostrar el archivo cargado
+                    this.actualizarInterfazArchivoSync();
+                    
+                    console.log('✅ Archivo tradicional persistente cargado correctamente');
+                } else {
+                    console.log('⚠️ Formato de archivo persistente no reconocido');
+                }
             }
         } catch (error) {
             console.error('❌ Error cargando archivo de sincronización persistente:', error);
@@ -427,20 +515,35 @@ class SistemaVentas {
     }
 
     // Guardar archivo de sincronización en localStorage para persistencia
-    guardarArchivoSyncPersistente(archivo) {
+    async guardarArchivoSyncPersistente(archivo) {
         try {
-            const reader = new FileReader();
-            reader.onload = (e) => {
+            // Si es un FileHandle de File System Access API
+            if (archivo && typeof archivo.getFile === 'function') {
                 const datosArchivo = {
                     nombre: archivo.name,
-                    contenido: e.target.result,
+                    tipo: 'fileHandle',
                     fechaSeleccion: new Date().toISOString()
                 };
                 
                 localStorage.setItem('archivoSyncSeleccionado', JSON.stringify(datosArchivo));
-                console.log('💾 Archivo de sincronización guardado persistentemente:', archivo.name);
-            };
-            reader.readAsText(archivo);
+                console.log('💾 Handle de archivo guardado persistentemente:', archivo.name);
+            }
+            // Si es un File tradicional
+            else if (archivo && archivo instanceof File) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const datosArchivo = {
+                        nombre: archivo.name,
+                        contenido: e.target.result,
+                        tipo: 'file',
+                        fechaSeleccion: new Date().toISOString()
+                    };
+                    
+                    localStorage.setItem('archivoSyncSeleccionado', JSON.stringify(datosArchivo));
+                    console.log('💾 Archivo tradicional guardado persistentemente:', archivo.name);
+                };
+                reader.readAsText(archivo);
+            }
         } catch (error) {
             console.error('❌ Error guardando archivo de sincronización persistente:', error);
         }
@@ -453,8 +556,10 @@ class SistemaVentas {
         const nombreArchivo = document.getElementById('nombreArchivo');
         const btnEjecutar = document.getElementById('ejecutarSync');
         
-        if (this.archivoSyncSeleccionado) {
-            if (nombreArchivo) nombreArchivo.textContent = this.archivoSyncSeleccionado.name;
+        // Verificar si tenemos un archivo seleccionado (tradicional o handle)
+        if (this.archivoSyncSeleccionado || this.archivoSyncHandle) {
+            const nombre = this.archivoSyncSeleccionado ? this.archivoSyncSeleccionado.name : this.archivoSyncHandle.name;
+            if (nombreArchivo) nombreArchivo.textContent = nombre;
             if (archivoSeleccionado) archivoSeleccionado.style.display = 'block';
             if (btnEjecutar) btnEjecutar.disabled = false;
         }
@@ -463,6 +568,7 @@ class SistemaVentas {
     // Limpiar selección de archivo de sincronización
     limpiarSeleccionSync() {
         this.archivoSyncSeleccionado = null;
+        this.archivoSyncHandle = null;
         const archivoSeleccionado = document.getElementById('archivoSeleccionado');
         const btnEjecutar = document.getElementById('ejecutarSync');
         const inputSyncCSV = document.getElementById('inputSyncCSV');
